@@ -13,5 +13,9 @@ Features
 
 Architecture
 	root_sup
-		data_server
-		gui_server
+		data_buffer
+			Holds the data buffer and performs synchronous operations on it.
+		data_mod_queue
+			An operations queue in front of the data_buffer process, that receives async messages and prevents the data buffer from being flooded.
+		gui
+			User front-end that sends messages to the operations queue when a modification should be made. It also receives updates from the data buffer about its current state.
