@@ -14,8 +14,8 @@ Features
 Architecture
 	root_sup
 		data_buffer
-			Holds the data buffer and performs synchronous operations on it.
-		data_mod_queue
-			An operations queue in front of the data_buffer process, that receives async messages and prevents the data buffer from being flooded.
+			Holds the current data buffer and responds to messages from the gui. Spawns data_mod processes when a modification should be made on the data.
+		data_mod
+			A one-shot process that performs a given modification on a supplied set of data. Then sends the modified data back to the owner.
 		gui
-			User front-end that sends messages to the operations queue when a modification should be made. It also receives updates from the data buffer about its current state.
+			User front-end that sends messages to the data_buffer when a modification should be made. It also receives updates from the data_buffer about its current state.
