@@ -1,0 +1,17 @@
+erledit
+	An interactive code editor for erlang.
+
+Purpose
+	* To have an integrated development environment for erlang, that makes it easier to develop erlang systems than the emacs + terminal setup.
+	* To act as an example on how a desktop application can be designed using erlang.
+
+Features
+	* An editor that works with the code within the erlang VM, making it environment-aware. This will provide better syntax highlighting and completion.
+	* Internal supervision structure makes the application fault tolerant and separates data from presentation.
+	* A shell within the editor that can be used like the erl shell, possibly with some extra functions specific to the editor.
+	* Extensibility by updating the editor modules while it still runs.
+
+Architecture
+	root_sup
+		data_server
+		gui_server
