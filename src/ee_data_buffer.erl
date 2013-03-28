@@ -1,4 +1,4 @@
--module(erledit_server).
+-module(ee_data_buffer).
 -behaviour(gen_server).
 
 %% API

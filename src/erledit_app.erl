@@ -1,5 +1,4 @@
 -module(erledit_app).
-
 -behaviour(application).
 
 %% Application callbacks
@@ -10,7 +9,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    erledit_sup:start_link().
+    ee_root_sup:start_link().
 
 stop(_State) ->
     ok.

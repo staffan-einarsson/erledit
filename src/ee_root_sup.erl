@@ -1,5 +1,4 @@
--module(erledit_sup).
-
+-module(ee_root_sup).
 -behaviour(supervisor).
 
 %% API
@@ -23,5 +22,5 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, {{one_for_one, 5, 10}, [?CHILD(erledit_server, worker)]}}.
+    {ok, {{one_for_one, 5, 10}, [?CHILD(ee_document_sup, supervisor)]}}.
 
