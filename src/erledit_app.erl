@@ -1,3 +1,10 @@
+%%%-------------------------------------------------------------------
+%%% @author Staffan <staffan.einarsson@gmail.com>
+%%% @copyright 2013 Staffan Einarsson
+%%% @doc 
+%%% @end
+%%%-------------------------------------------------------------------
+
 -module(erledit_app).
 -behaviour(application).
 
@@ -9,7 +16,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    ee_root_sup:start_link().
+	ee_root_sup:start_link().
 
 stop(_State) ->
-    ok.
+	ok.

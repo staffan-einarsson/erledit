@@ -1,3 +1,10 @@
+%%%-------------------------------------------------------------------
+%%% @author Staffan <staffan.einarsson@gmail.com>
+%%% @copyright 2013 Staffan Einarsson
+%%% @doc 
+%%% @end
+%%%-------------------------------------------------------------------
+
 -module(erledit).
 
 %% API

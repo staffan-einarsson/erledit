@@ -1,3 +1,10 @@
+%%%-------------------------------------------------------------------
+%%% @author Staffan <staffan.einarsson@gmail.com>
+%%% @copyright 2013 Staffan Einarsson
+%%% @doc 
+%%% @end
+%%%-------------------------------------------------------------------
+
 -module(ee_root_sup).
 -behaviour(supervisor).
 
@@ -15,12 +22,12 @@
 %% ===================================================================
 
 start_link() ->
-    supervisor:start_link(?MODULE, []).
+	supervisor:start_link(?MODULE, []).
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
 init([]) ->
-    {ok, {{one_for_one, 5, 10}, [?CHILD(ee_document_sup, supervisor)]}}.
+	{ok, {{one_for_one, 5, 10}, [?CHILD(ee_document_sup, supervisor)]}}.
 
