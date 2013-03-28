@@ -22,5 +22,5 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, {{one_for_one, 5, 10}, [?CHILD(ee_data_buffer, worker)]}}.
+    {ok, {{one_for_one, 5, 10}, [?CHILD(ee_gui, worker)]}}.
 

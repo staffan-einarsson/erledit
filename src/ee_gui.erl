@@ -1,4 +1,4 @@
--module(ee_data_buffer).
+-module(ee_gui).
 -behaviour(gen_server).
 
 %% API
