@@ -54,14 +54,18 @@ handle_cast(Msg, State) ->
 	io:format("~p Got Cast ~p~n", [self(), Msg]),
 	{noreply, State}.
 
-handle_info(#wx{event=#wxClose{}}, State = #state{win=Frame}) ->
+handle_info(#wx{event = #wxClose{}}, State = #state{win=Frame}) ->
 	io:format("~p Closing window ~n", [self()]),
 	ok = wxFrame:setStatusText(Frame, "Closing...",[]),
 	wxWindow:destroy(Frame),
 	{stop, normal, State};
+handle_info(#wx{event = #wxKey{type = char}}, State) ->
+	%% Send message to data buffer to update.
+	gen_server:cast(data_buffer, {char, "a"}),
+	{noreply, State};
 handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
-	{noreply,State}.
+	{noreply, State}.
 
 code_change(_, _, State) ->
 	{stop, not_yet_implemented, State}.
@@ -83,6 +87,7 @@ create_window() ->
 
 	%% Subscribe to events.
 	wxFrame:connect(Frame, close_window),
+	wxFrame:connect(TextCtrl, char),
 
 	wxWindow:show(Frame),
 	{Frame, TextCtrl}.

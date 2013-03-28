@@ -39,7 +39,7 @@ start_link(Args) ->
 init(Args) ->
 	{filename, FileName} = proplists:lookup(filename, Args),
 	{ok, File} = file:open(FileName, [read]),
-	{ok, Buffer=[_|_]} = file:read(File, 100000),
+	{ok, Buffer = [_|_]} = file:read(File, 100000),
 	ok = file:close(File),
 	{ok, #state{buffer = Buffer}}.
 
@@ -51,7 +51,11 @@ handle_cast(display, State = #state{buffer = Buffer}) ->
 	{noreply, State};
 handle_cast({subscribe, Pid}, State = #state{buffer = Buffer, subscribers = Subscribers}) ->
 	gen_server:cast(Pid, {buffer, Buffer}),
-	{noreply, State#state{subscribers=[Pid|Subscribers]}};
+	{noreply, State#state{subscribers = [Pid|Subscribers]}};
+handle_cast({char, Char}, State = #state{buffer = Buffer, subscribers = [S]}) ->
+	NewBuffer = Char ++ Buffer,
+	gen_server:cast(S, {buffer, NewBuffer}),
+	{noreply, State#state{buffer = NewBuffer}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
