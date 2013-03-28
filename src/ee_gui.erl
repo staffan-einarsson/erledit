@@ -19,14 +19,14 @@
 
 -include_lib("wx/include/wx.hrl").
 
--record(state, {win}).
+-record(state, {win, text, buffer=[]}).
 
 %% ===================================================================
 %% API
 %% ===================================================================
 
 start_link() ->
-	gen_server:start_link(?MODULE, [], []).
+	gen_server:start_link({local, gui}, ?MODULE, [], []).
 
 %% ===================================================================
 %% gen_server callbacks
@@ -34,8 +34,9 @@ start_link() ->
 
 init([]) ->
 	wx:new(),
-	Frame = create_window(),
-	{ok, #state{win=Frame}}.
+	{Frame, TextCtrl} = create_window(),
+	gen_server:cast(data_buffer, {subscribe, self()}),
+	{ok, #state{win = Frame, text = TextCtrl}}.
 
 terminate(_Reason, _State) ->
 	io:format("~p Cleaning up~n", [self()]),
@@ -46,6 +47,9 @@ handle_call(Msg, _From, State) ->
 	io:format("~p Got Call ~p~n", [self(), Msg]),
 	{reply, ok, State}.
 
+handle_cast({buffer, Buffer}, State = #state{text = TextCtrl}) ->
+	wxTextCtrl:setValue(TextCtrl, Buffer),
+	{noreply, State#state{buffer = Buffer}};
 handle_cast(Msg, State) ->
 	io:format("~p Got Cast ~p~n", [self(), Msg]),
 	{noreply, State}.
@@ -69,14 +73,16 @@ code_change(_, _, State) ->
 create_window() ->
 	Frame = wxFrame:new(wx:null(), 
 			-1, % window id
-			"Hello World", % window title
-			[{size, {600,400}}]),
+			"erledit", % window title
+			[{size, {600, 400}}]),
+	
+	TextCtrl = wxTextCtrl:new(Frame, -1, [{size, {200, 200}}]),
 
 	wxFrame:createStatusBar(Frame),
-	ok = wxFrame:setStatusText(Frame, "Hello World!",[]),
+	ok = wxFrame:setStatusText(Frame, "",[]),
 
 	%% Subscribe to events.
 	wxFrame:connect(Frame, close_window),
 
 	wxWindow:show(Frame),
-	Frame.
+	{Frame, TextCtrl}.
