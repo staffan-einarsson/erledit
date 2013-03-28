@@ -76,7 +76,7 @@ create_window() ->
 			"erledit", % window title
 			[{size, {600, 400}}]),
 	
-	TextCtrl = wxTextCtrl:new(Frame, -1, [{size, {200, 200}}]),
+	TextCtrl = wxTextCtrl:new(Frame, -1, [{style, ?wxTE_MULTILINE}]),
 
 	wxFrame:createStatusBar(Frame),
 	ok = wxFrame:setStatusText(Frame, "",[]),

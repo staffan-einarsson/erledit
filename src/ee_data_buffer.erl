@@ -39,7 +39,7 @@ start_link(Args) ->
 init(Args) ->
 	{filename, FileName} = proplists:lookup(filename, Args),
 	{ok, File} = file:open(FileName, [read]),
-	{ok, Buffer=[_|_]} = file:read(File, 1000),
+	{ok, Buffer=[_|_]} = file:read(File, 100000),
 	ok = file:close(File),
 	{ok, #state{buffer = Buffer}}.
 
