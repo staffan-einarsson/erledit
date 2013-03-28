@@ -12,7 +12,7 @@ Features
 	* Extensibility by updating the editor modules while it still runs.
 
 Architecture
-	root_sup
+	document_sup
 		data_buffer
 			Holds the current data buffer and responds to messages from the gui. Spawns data_mod processes when a modification should be made on the data.
 		data_mod
