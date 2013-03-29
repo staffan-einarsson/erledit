@@ -49,13 +49,12 @@ handle_call(_Request, _From, State) ->
 handle_cast(display, State = #state{buffer = Buffer}) ->
 	io:format("Displaying contents of file:~n~p~n", [Buffer]),
 	{noreply, State};
-handle_cast({subscribe, Pid}, State = #state{buffer = Buffer, subscribers = Subscribers}) ->
+handle_cast({get_buffer, Pid}, #state{buffer = Buffer} = State) ->
 	gen_server:cast(Pid, {buffer, Buffer}),
-	{noreply, State#state{subscribers = [Pid|Subscribers]}};
-handle_cast({char, Char}, State = #state{buffer = Buffer, subscribers = [S]}) ->
-	NewBuffer = Char ++ Buffer,
-	gen_server:cast(S, {buffer, NewBuffer}),
-	{noreply, State#state{buffer = NewBuffer}};
+	{noreply, State};
+handle_cast({char, Char}, #state{buffer = Buffer0} = State) ->
+	Buffer1 = Char ++ Buffer0,
+	{noreply, State#state{buffer = Buffer1}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 

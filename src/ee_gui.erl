@@ -38,7 +38,7 @@ start_link() ->
 init([]) ->
 	wx:new(),
 	MainWindow = create_window(),
-	gen_server:cast(data_buffer, {subscribe, self()}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
 	{ok, #state{win = MainWindow}}.
 
 terminate(_Reason, _State) ->
@@ -69,6 +69,7 @@ handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}}
 handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, State) ->
 	%% Send message to data buffer to update.
 	gen_server:cast(data_buffer, {char, [Char]}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
 	{noreply, State};
 handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
