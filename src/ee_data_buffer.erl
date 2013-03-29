@@ -17,6 +17,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	terminate/2, code_change/3]).
 
+-include("ee_document.hrl").
+	
 -record(state, {buffer=[], subscribers=[]}).
 
 %%%===================================================================
@@ -43,7 +45,14 @@ init(Args) ->
 	{ok, File} = file:open(FileName, [read]),
 	{ok, Buffer = [_|_]} = file:read(File, 100000),
 	ok = file:close(File),
-	{ok, #state{buffer = Buffer}}.
+	Lines = string:tokens(Buffer, "\n"),
+	{LineStructs, _} = lists:mapfoldl(
+		fun(LineData, LineNo) ->
+			{#buffer_line{num = LineNo, data = LineData}, LineNo + 1}
+			end,
+		0, Lines),
+	io:format("~p~n", [LineStructs]),
+	{ok, #state{buffer = LineStructs}}.
 
 terminate(_Reason, _State) ->
 	ok.

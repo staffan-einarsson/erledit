@@ -18,6 +18,7 @@
 %-compile(export_all).
 
 -include_lib("wx/include/wx.hrl").
+-include("ee_document.hrl").
 
 -record(state, {win, buffer=[]}).
 -record(main_window, {window, status_bar}).
@@ -52,10 +53,7 @@ handle_call(Msg, _From, State) ->
 
 handle_cast({buffer, Buffer}, #state{win = #main_window{window = Window}} = State) ->
 	%% TODO: Update text by triggering paint events instead, setting updated areas as dirty.
-	DC = wxClientDC:new(Window),
-	ok = wxDC:clear(DC),
-	ok = wxDC:drawText(DC, Buffer, {0, 0}),
-	wxClientDC:destroy(DC),
+	ok = draw_buffer(Window, Buffer),
 	{noreply, State#state{buffer = Buffer}};
 handle_cast(Msg, State) ->
 	io:format("~p Got Cast ~p~n", [self(), Msg]),
@@ -95,3 +93,16 @@ create_window() ->
 	%% Show window.
 	wxWindow:show(Window),
 	#main_window{window = Window, status_bar = StatusBar}.
+
+draw_buffer(Window, Buffer) ->
+	DC = wxClientDC:new(Window),
+	ok = wxDC:clear(DC),
+	ok = draw_buffer_lines(DC, Buffer),
+	wxClientDC:destroy(DC),
+	ok.
+
+draw_buffer_lines(_, []) ->
+	ok;
+draw_buffer_lines(DC, [#buffer_line{num = Number, data = Data}|T]) ->
+	ok = wxDC:drawText(DC, Data, {0, Number * 20}),
+	draw_buffer_lines(DC, T).
