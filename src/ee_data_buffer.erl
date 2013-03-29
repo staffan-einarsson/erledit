@@ -30,7 +30,9 @@
 %%--------------------------------------------------------------------
 
 start_link(Args) ->
-	gen_server:start_link({local, data_buffer}, ?MODULE, [Args], []).
+	gen_server:start_link({local, data_buffer}, ?MODULE, [Args], [
+		%{debug, [trace]}
+		]).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -46,7 +48,7 @@ init(Args) ->
 handle_call(_Request, _From, State) ->
 	{reply, ok, State}.
 
-handle_cast(display, State = #state{buffer = Buffer}) ->
+handle_cast(display, #state{buffer = Buffer} = State) ->
 	io:format("Displaying contents of file:~n~p~n", [Buffer]),
 	{noreply, State};
 handle_cast({get_buffer, Pid}, #state{buffer = Buffer} = State) ->
