@@ -20,13 +20,16 @@
 -include_lib("wx/include/wx.hrl").
 
 -record(state, {win, buffer=[]}).
+-record(main_window, {window, status_bar}).
 
 %% ===================================================================
 %% API
 %% ===================================================================
 
 start_link() ->
-	gen_server:start_link({local, gui}, ?MODULE, [], []).
+	gen_server:start_link({local, gui}, ?MODULE, [], [
+		%{debug, [trace]}
+		]).
 
 %% ===================================================================
 %% gen_server callbacks
@@ -34,9 +37,9 @@ start_link() ->
 
 init([]) ->
 	wx:new(),
-	{Frame} = create_window(),
+	MainWindow = create_window(),
 	gen_server:cast(data_buffer, {subscribe, self()}),
-	{ok, #state{win = Frame}}.
+	{ok, #state{win = MainWindow}}.
 
 terminate(_Reason, _State) ->
 	io:format("~p Cleaning up~n", [self()]),
@@ -47,9 +50,9 @@ handle_call(Msg, _From, State) ->
 	io:format("~p Got Call ~p~n", [self(), Msg]),
 	{reply, ok, State}.
 
-handle_cast({buffer, Buffer}, State = #state{win = Win}) ->
+handle_cast({buffer, Buffer}, #state{win = #main_window{window = Window}} = State) ->
 	%% TODO: Update text by triggering paint events instead, setting updated areas as dirty.
-	DC = wxClientDC:new(Win),
+	DC = wxClientDC:new(Window),
 	ok = wxDC:clear(DC),
 	ok = wxDC:drawText(DC, Buffer, {0, 0}),
 	wxClientDC:destroy(DC),
@@ -58,10 +61,10 @@ handle_cast(Msg, State) ->
 	io:format("~p Got Cast ~p~n", [self(), Msg]),
 	{noreply, State}.
 
-handle_info(#wx{event = #wxClose{}}, State = #state{win=Frame}) ->
+handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
 	io:format("~p Closing window ~n", [self()]),
-	ok = wxFrame:setStatusText(Frame, "Closing...",[]),
-	wxWindow:destroy(Frame),
+	ok = wxFrame:setStatusText(Window, "Closing...",[]),
+	wxWindow:destroy(Window),
 	{stop, normal, State};
 handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, State) ->
 	%% Send message to data buffer to update.
@@ -79,17 +82,15 @@ code_change(_, _, State) ->
 %% ===================================================================
 
 create_window() ->
-	Frame = wxFrame:new(wx:null(), 
-			-1, % window id
-			"erledit", % window title
-			[{size, {600, 400}}]),
-	
-	wxFrame:createStatusBar(Frame),
-	ok = wxFrame:setStatusText(Frame, ""),
+	%% Create the window.
+	Window = wxFrame:new(wx:null(), -1, "erledit", [{size, {600, 400}}]),
+	StatusBar = wxFrame:createStatusBar(Window),
+	ok = wxStatusBar:setStatusText(StatusBar, ""),
 
 	%% Subscribe to events.
-	wxFrame:connect(Frame, close_window),
-	wxFrame:connect(Frame, char),
+	wxFrame:connect(Window, close_window),
+	wxFrame:connect(Window, char),
 
-	wxWindow:show(Frame),
-	{Frame}.
+	%% Show window.
+	wxWindow:show(Window),
+	#main_window{window = Window, status_bar = StatusBar}.
