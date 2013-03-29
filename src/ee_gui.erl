@@ -19,7 +19,7 @@
 
 -include_lib("wx/include/wx.hrl").
 
--record(state, {win, text, buffer=[]}).
+-record(state, {win, buffer=[]}).
 
 %% ===================================================================
 %% API
@@ -34,9 +34,9 @@ start_link() ->
 
 init([]) ->
 	wx:new(),
-	{Frame, TextCtrl} = create_window(),
+	{Frame} = create_window(),
 	gen_server:cast(data_buffer, {subscribe, self()}),
-	{ok, #state{win = Frame, text = TextCtrl}}.
+	{ok, #state{win = Frame}}.
 
 terminate(_Reason, _State) ->
 	io:format("~p Cleaning up~n", [self()]),
@@ -47,8 +47,12 @@ handle_call(Msg, _From, State) ->
 	io:format("~p Got Call ~p~n", [self(), Msg]),
 	{reply, ok, State}.
 
-handle_cast({buffer, Buffer}, State = #state{text = TextCtrl}) ->
-	wxTextCtrl:setValue(TextCtrl, Buffer),
+handle_cast({buffer, Buffer}, State = #state{win = Win}) ->
+	%% TODO: Update text by triggering paint events instead, setting updated areas as dirty.
+	DC = wxClientDC:new(Win),
+	ok = wxDC:clear(DC),
+	ok = wxDC:drawText(DC, Buffer, {0, 0}),
+	wxClientDC:destroy(DC),
 	{noreply, State#state{buffer = Buffer}};
 handle_cast(Msg, State) ->
 	io:format("~p Got Cast ~p~n", [self(), Msg]),
@@ -59,9 +63,9 @@ handle_info(#wx{event = #wxClose{}}, State = #state{win=Frame}) ->
 	ok = wxFrame:setStatusText(Frame, "Closing...",[]),
 	wxWindow:destroy(Frame),
 	{stop, normal, State};
-handle_info(#wx{event = #wxKey{type = char}}, State) ->
+handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, State) ->
 	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, "a"}),
+	gen_server:cast(data_buffer, {char, [Char]}),
 	{noreply, State};
 handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
@@ -80,14 +84,12 @@ create_window() ->
 			"erledit", % window title
 			[{size, {600, 400}}]),
 	
-	TextCtrl = wxTextCtrl:new(Frame, -1, [{style, ?wxTE_MULTILINE}]),
-
 	wxFrame:createStatusBar(Frame),
-	ok = wxFrame:setStatusText(Frame, "",[]),
+	ok = wxFrame:setStatusText(Frame, ""),
 
 	%% Subscribe to events.
 	wxFrame:connect(Frame, close_window),
-	wxFrame:connect(TextCtrl, char),
+	wxFrame:connect(Frame, char),
 
 	wxWindow:show(Frame),
-	{Frame, TextCtrl}.
+	{Frame}.
