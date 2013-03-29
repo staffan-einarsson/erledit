@@ -75,8 +75,8 @@ handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
 	{noreply, State}.
 
-code_change(_, _, State) ->
-	{stop, not_yet_implemented, State}.
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
 
 %% ===================================================================
 %% Internal functions

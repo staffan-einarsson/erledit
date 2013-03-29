@@ -45,6 +45,9 @@ init(Args) ->
 	ok = file:close(File),
 	{ok, #state{buffer = Buffer}}.
 
+terminate(_Reason, _State) ->
+	ok.
+
 handle_call(_Request, _From, State) ->
 	{reply, ok, State}.
 
@@ -62,9 +65,6 @@ handle_cast(_Msg, State) ->
 
 handle_info(_Info, State) ->
 	{noreply, State}.
-
-terminate(_Reason, _State) ->
-	ok.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
