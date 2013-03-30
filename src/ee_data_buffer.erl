@@ -66,9 +66,9 @@ handle_cast(display, #state{buffer = Buffer} = State) ->
 handle_cast({get_buffer, Pid}, #state{buffer = Buffer} = State) ->
 	gen_server:cast(Pid, {buffer, Buffer}),
 	{noreply, State};
-handle_cast({char, Char}, #state{buffer = Buffer0} = State) ->
+handle_cast({char, Char}, #state{buffer = [#buffer_line{data = Buffer0} = Line|T]} = State) ->
 	Buffer1 = Char ++ Buffer0,
-	{noreply, State#state{buffer = Buffer1}};
+	{noreply, State#state{buffer = [Line#buffer_line{data = Buffer1}|T]}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
