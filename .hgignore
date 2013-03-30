@@ -1,2 +1,3 @@
 syntax:glob
 ebin
+erl_crash.dump
