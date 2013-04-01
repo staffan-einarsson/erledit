@@ -66,9 +66,8 @@ handle_cast(display, #state{buffer = Buffer} = State) ->
 handle_cast({get_buffer, Pid}, #state{buffer = Buffer} = State) ->
 	gen_server:cast(Pid, {buffer, Buffer}),
 	{noreply, State};
-handle_cast({char, Char}, #state{buffer = [#buffer_line{data = Buffer0} = Line|T]} = State) ->
-	Buffer1 = Char ++ Buffer0,
-	{noreply, State#state{buffer = [Line#buffer_line{data = Buffer1}|T]}};
+handle_cast({char, Char, Pos}, #state{buffer = Buffer} = State) ->
+	{noreply, State#state{buffer = insert_text(Buffer, Char, Pos)}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
@@ -81,3 +80,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+insert_text([#buffer_line{data = Data} = Line|T], Text, Pos) when Pos < length(Data) ->
+	{A, B} = lists:split(Pos, Data),
+	[Line#buffer_line{data = A ++ (Text ++ B)}|T];
+insert_text([#buffer_line{data = Data} = Line|T], Text, Pos) ->
+	[Line|insert_text(T, Text, Pos - length(Data))].

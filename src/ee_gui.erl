@@ -49,8 +49,8 @@ terminate(_Reason, _State) ->
 	wx:destroy(),
 	ok.
 
-handle_call({get_buffer}, _From, #state{buffer = Buffer} = State) ->
-	{reply, Buffer, State};
+handle_call({get_buffer}, _From, #state{buffer = Buffer, caret_pos = CaretPos} = State) ->
+	{reply, {Buffer, CaretPos}, State};
 handle_call(Msg, _From, State) ->
 	io:format("~p Got Call ~p~n", [self(), Msg]),
 	{reply, ok, State}.
@@ -65,15 +65,18 @@ handle_cast(Msg, State) ->
 handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
 	wxWindow:destroy(Window),
 	{stop, normal, State};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_LEFT}}, #state{caret_pos = CaretPos} = State) ->
-	{noreply, State#state{caret_pos = CaretPos - 1}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RIGHT}}, #state{caret_pos = CaretPos} = State) ->
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_LEFT}}, #state{win = #main_window{window = Window}, caret_pos = CaretPos} = State) ->
+	wxFrame:refresh(Window),
+	{noreply, State#state{caret_pos = max(0, CaretPos - 1)}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RIGHT}}, #state{win = #main_window{window = Window}, caret_pos = CaretPos} = State) ->
+	wxFrame:refresh(Window),
+	%% TODO: Limit caret pos to total buffer size.
 	{noreply, State#state{caret_pos = CaretPos + 1}};
-handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, State) ->
+handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, #state{caret_pos = CaretPos} = State) ->
 	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, [Char]}),
+	gen_server:cast(data_buffer, {char, [Char], CaretPos}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	{noreply, State};
+	{noreply, State#state{caret_pos = CaretPos + 1}};
 handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
 	{noreply, State}.
@@ -103,14 +106,15 @@ create_window() ->
 	#main_window{window = Window, status_bar = StatusBar}.
 
 handle_paint(#wx{obj = Window}, _WxObject) ->
-	Buffer = gen_server:call(gui, {get_buffer}),
-	draw_buffer(Window, Buffer),
+	{Buffer, CaretPos} = gen_server:call(gui, {get_buffer}),
+	draw_buffer(Window, Buffer, CaretPos),
 	ok.
 
-draw_buffer(Window, Buffer) ->
+draw_buffer(Window, Buffer, CaretPos) ->
 	DC = wxPaintDC:new(Window),
 	ok = wxDC:clear(DC),
 	ok = draw_buffer_lines(DC, Buffer),
+	ok = draw_caret(DC, Buffer, CaretPos),
 	wxPaintDC:destroy(DC),
 	ok.
 
@@ -119,3 +123,12 @@ draw_buffer_lines(_DC, []) ->
 draw_buffer_lines(DC, [#buffer_line{num = Number, data = Data}|T]) ->
 	ok = wxDC:drawText(DC, Data, {0, Number * 20}),
 	draw_buffer_lines(DC, T).
+
+draw_caret(_DC, [], _CaretPos) ->
+	ok;
+draw_caret(DC, [#buffer_line{num = Number, data = Data}|_], CaretPos) when CaretPos < length(Data) ->
+	{W, H} = wxDC:getTextExtent(DC, lists:sublist(Data, CaretPos)),
+	wxDC:drawLine(DC, {W, Number * 20}, {W, Number * 20 + H}),
+	ok;
+draw_caret(DC, [#buffer_line{data = Data}|T], CaretPos) ->
+	draw_caret(DC, T, CaretPos - length(Data)).
