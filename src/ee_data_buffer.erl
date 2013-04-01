@@ -51,7 +51,7 @@ init(Args) ->
 			{#buffer_line{num = LineNo, data = LineData}, LineNo + 1}
 			end,
 		0, Lines),
-	io:format("~p~n", [LineStructs]),
+	%io:format("~p~n", [LineStructs]),
 	{ok, #state{buffer = LineStructs}}.
 
 terminate(_Reason, _State) ->

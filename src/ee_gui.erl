@@ -15,12 +15,14 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+-export([handle_paint/2]).
+
 %-compile(export_all).
 
 -include_lib("wx/include/wx.hrl").
 -include("ee_document.hrl").
 
--record(state, {win, buffer=[]}).
+-record(state, {win, buffer = [], caret_pos = 0}).
 -record(main_window, {window, status_bar}).
 
 %% ===================================================================
@@ -47,23 +49,26 @@ terminate(_Reason, _State) ->
 	wx:destroy(),
 	ok.
 
+handle_call({get_buffer}, _From, #state{buffer = Buffer} = State) ->
+	{reply, Buffer, State};
 handle_call(Msg, _From, State) ->
 	io:format("~p Got Call ~p~n", [self(), Msg]),
 	{reply, ok, State}.
 
 handle_cast({buffer, Buffer}, #state{win = #main_window{window = Window}} = State) ->
-	%% TODO: Update text by triggering paint events instead, setting updated areas as dirty.
-	ok = draw_buffer(Window, Buffer),
+	wxFrame:refresh(Window),
 	{noreply, State#state{buffer = Buffer}};
 handle_cast(Msg, State) ->
 	io:format("~p Got Cast ~p~n", [self(), Msg]),
 	{noreply, State}.
 
 handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
-	io:format("~p Closing window ~n", [self()]),
-	ok = wxFrame:setStatusText(Window, "Closing...",[]),
 	wxWindow:destroy(Window),
 	{stop, normal, State};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_LEFT}}, #state{caret_pos = CaretPos} = State) ->
+	{noreply, State#state{caret_pos = CaretPos - 1}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RIGHT}}, #state{caret_pos = CaretPos} = State) ->
+	{noreply, State#state{caret_pos = CaretPos + 1}};
 handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, State) ->
 	%% Send message to data buffer to update.
 	gen_server:cast(data_buffer, {char, [Char]}),
@@ -89,19 +94,27 @@ create_window() ->
 	%% Subscribe to events.
 	wxFrame:connect(Window, close_window),
 	wxFrame:connect(Window, char),
+	wxFrame:connect(Window, paint
+		, [{callback, fun handle_paint/2}]
+		),
 
 	%% Show window.
 	wxWindow:show(Window),
 	#main_window{window = Window, status_bar = StatusBar}.
 
-draw_buffer(Window, Buffer) ->
-	DC = wxClientDC:new(Window),
-	ok = wxDC:clear(DC),
-	ok = draw_buffer_lines(DC, Buffer),
-	wxClientDC:destroy(DC),
+handle_paint(#wx{obj = Window}, _WxObject) ->
+	Buffer = gen_server:call(gui, {get_buffer}),
+	draw_buffer(Window, Buffer),
 	ok.
 
-draw_buffer_lines(_, []) ->
+draw_buffer(Window, Buffer) ->
+	DC = wxPaintDC:new(Window),
+	ok = wxDC:clear(DC),
+	ok = draw_buffer_lines(DC, Buffer),
+	wxPaintDC:destroy(DC),
+	ok.
+
+draw_buffer_lines(_DC, []) ->
 	ok;
 draw_buffer_lines(DC, [#buffer_line{num = Number, data = Data}|T]) ->
 	ok = wxDC:drawText(DC, Data, {0, Number * 20}),
