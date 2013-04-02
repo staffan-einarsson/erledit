@@ -45,12 +45,7 @@ init(Args) ->
 	{ok, File} = file:open(FileName, [read]),
 	{ok, Buffer = [_|_]} = file:read(File, 100000),
 	ok = file:close(File),
-	Lines = string:tokens(Buffer, "\n"),
-	{LineStructs, _} = lists:mapfoldl(
-		fun(LineData, LineNo) ->
-			{#buffer_line{num = LineNo, data = LineData}, LineNo + 1}
-			end,
-		0, Lines),
+	LineStructs = split_buffer(Buffer),
 	%io:format("~p~n", [LineStructs]),
 	{ok, #state{buffer = LineStructs}}.
 
@@ -86,3 +81,17 @@ insert_text([#buffer_line{data = Data} = Line|T], Text, Pos) when Pos < length(D
 	[Line#buffer_line{data = A ++ (Text ++ B)}|T];
 insert_text([#buffer_line{data = Data} = Line|T], Text, Pos) ->
 	[Line|insert_text(T, Text, Pos - length(Data))].
+
+split_buffer(Buffer) ->
+	split_buffer_loop(Buffer, 0, [], []).
+
+split_buffer_loop([], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
+	lists:reverse([#buffer_line{num = CurrentLineNo, data = lists:reverse(CurrentLineBufferRev)}|PrevLinesRev]);
+split_buffer_loop([Char|T] = Buffer, CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
+	[NewLine] = "\n",
+	case Char =:= NewLine of
+		true ->
+			split_buffer_loop(T, CurrentLineNo + 1, [], [#buffer_line{num = CurrentLineNo, data = lists:reverse([Char|CurrentLineBufferRev])}|PrevLinesRev]);
+		_ ->
+			split_buffer_loop(T, CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev)
+	end.
