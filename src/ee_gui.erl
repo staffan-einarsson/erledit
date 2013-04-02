@@ -112,9 +112,13 @@ handle_paint(#wx{obj = Window}, _WxObject) ->
 
 draw_buffer(Window, Buffer, CaretPos) ->
 	DC = wxPaintDC:new(Window),
+	ok = wxDC:setBackground(DC, ?wxWHITE_BRUSH),
+	Font = wxFont:new(10, ?wxFONTFAMILY_TELETYPE, ?wxFONTSTYLE_NORMAL, ?wxFONTWEIGHT_NORMAL),
+	ok = wxDC:setFont(DC, Font),
 	ok = wxDC:clear(DC),
 	ok = draw_buffer_lines(DC, Buffer),
 	ok = draw_caret(DC, Buffer, CaretPos),
+	wxFont:destroy(Font),
 	wxPaintDC:destroy(DC),
 	ok.
 
