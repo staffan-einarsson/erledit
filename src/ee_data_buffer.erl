@@ -18,7 +18,7 @@
 	terminate/2, code_change/3]).
 
 -include("ee_document.hrl").
-	
+
 -record(state, {buffer=[], subscribers=[]}).
 
 %%%===================================================================
@@ -87,11 +87,9 @@ split_buffer(Buffer) ->
 
 split_buffer_loop([], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
 	lists:reverse([#buffer_line{num = CurrentLineNo, data = lists:reverse(CurrentLineBufferRev)}|PrevLinesRev]);
-split_buffer_loop([Char|T] = Buffer, CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
-	[NewLine] = "\n",
-	case Char =:= NewLine of
-		true ->
-			split_buffer_loop(T, CurrentLineNo + 1, [], [#buffer_line{num = CurrentLineNo, data = lists:reverse([Char|CurrentLineBufferRev])}|PrevLinesRev]);
-		_ ->
-			split_buffer_loop(T, CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev)
-	end.
+split_buffer_loop([?ASCII_LF|T], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
+	split_buffer_loop(T, CurrentLineNo + 1, [], [#buffer_line{num = CurrentLineNo, data = lists:reverse([?ASCII_LF|CurrentLineBufferRev])}|PrevLinesRev]);
+split_buffer_loop([?ASCII_CR, ?ASCII_LF|T], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
+	split_buffer_loop(T, CurrentLineNo + 1, [], [#buffer_line{num = CurrentLineNo, data = lists:reverse([?ASCII_LF, ?ASCII_CR|CurrentLineBufferRev])}|PrevLinesRev]);
+split_buffer_loop([Char|T], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
+	split_buffer_loop(T, CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev).

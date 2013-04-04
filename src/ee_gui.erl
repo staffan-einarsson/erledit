@@ -125,14 +125,34 @@ draw_buffer(Window, Buffer, CaretPos) ->
 draw_buffer_lines(_DC, []) ->
 	ok;
 draw_buffer_lines(DC, [#buffer_line{num = Number, data = Data}|T]) ->
-	ok = wxDC:drawText(DC, Data, {0, Number * 20}),
+	ok = draw_buffer_line(DC, Data, [], 0, Number * 20),
 	draw_buffer_lines(DC, T).
+
+draw_buffer_line(DC, [], LiteralCharsRev, XStart, Y) ->
+	LiteralChars = lists:reverse(LiteralCharsRev),
+	ok = wxDC:drawText(DC, LiteralChars, {XStart, Y});
+draw_buffer_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y) ->
+	LiteralChars = lists:reverse(LiteralCharsRev),
+	{W, _} = wxDC:getTextExtent(DC, LiteralChars),
+	ok = wxDC:drawText(DC, LiteralChars, {XStart, Y}),
+	draw_buffer_line(DC, T, [], (((XStart + W) div 50) + 1) * 50, Y);
+draw_buffer_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
+	draw_buffer_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
 
 draw_caret(_DC, [], _CaretPos) ->
 	ok;
 draw_caret(DC, [#buffer_line{num = Number, data = Data}|_], CaretPos) when CaretPos < length(Data) ->
-	{W, H} = wxDC:getTextExtent(DC, lists:sublist(Data, CaretPos)),
-	wxDC:drawLine(DC, {W, Number * 20}, {W, Number * 20 + H}),
-	ok;
+	draw_caret_on_line(DC, lists:sublist(Data, CaretPos), [], 0, Number * 20);
 draw_caret(DC, [#buffer_line{data = Data}|T], CaretPos) ->
 	draw_caret(DC, T, CaretPos - length(Data)).
+
+draw_caret_on_line(DC, [], LiteralCharsRev, XStart, Y) ->
+	LiteralChars = lists:reverse(LiteralCharsRev),
+	{W, H} = wxDC:getTextExtent(DC, LiteralChars),
+	ok = wxDC:drawLine(DC, {XStart + W, Y}, {XStart + W, Y + H});
+draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y) ->
+	LiteralChars = lists:reverse(LiteralCharsRev),
+	{W, _} = wxDC:getTextExtent(DC, LiteralChars),
+	draw_caret_on_line(DC, T, [], (((XStart + W) div 50) + 1) * 50, Y);
+draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
+	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
