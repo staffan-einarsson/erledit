@@ -22,8 +22,8 @@
 -include_lib("wx/include/wx.hrl").
 -include("ee_document.hrl").
 
--record(state, {win, buffer = [], caret_pos = 0}).
 -record(main_window, {window, status_bar}).
+-record(state, {win = #main_window{}, buffer = [], caret = #caret{}}).
 
 %% ===================================================================
 %% API
@@ -42,15 +42,17 @@ init([]) ->
 	wx:new(),
 	MainWindow = create_window(),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	{ok, #state{win = MainWindow}}.
+	State = #state{win = MainWindow},
+	io:format("~p Original state is ~p~n", [self(), State]),
+	{ok, State}.
 
-terminate(_Reason, _State) ->
-	io:format("~p Cleaning up~n", [self()]),
+terminate(Reason, State) ->
+	io:format("~p Terminate: Reason: ~p~nState: ~p~n", [self(), Reason, State]),
 	wx:destroy(),
 	ok.
 
-handle_call({get_buffer}, _From, #state{buffer = Buffer, caret_pos = CaretPos} = State) ->
-	{reply, {Buffer, CaretPos}, State};
+handle_call({get_buffer}, _From, #state{buffer = Buffer, caret = Caret} = State) ->
+	{reply, {Buffer, Caret}, State};
 handle_call(Msg, _From, State) ->
 	io:format("~p Got Call ~p~n", [self(), Msg]),
 	{reply, ok, State}.
@@ -65,18 +67,23 @@ handle_cast(Msg, State) ->
 handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
 	wxWindow:destroy(Window),
 	{stop, normal, State};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_LEFT}}, #state{win = #main_window{window = Window}, caret_pos = CaretPos} = State) ->
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_LEFT}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
 	wxFrame:refresh(Window),
-	{noreply, State#state{caret_pos = max(0, CaretPos - 1)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RIGHT}}, #state{win = #main_window{window = Window}, caret_pos = CaretPos} = State) ->
+	{noreply, State#state{caret = move_caret_left(Caret, Buffer)}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RIGHT}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
 	wxFrame:refresh(Window),
-	%% TODO: Limit caret pos to total buffer size.
-	{noreply, State#state{caret_pos = CaretPos + 1}};
-handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, #state{caret_pos = CaretPos} = State) ->
+	{noreply, State#state{caret = move_caret_right(Caret, Buffer)}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_UP}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	{noreply, State#state{caret = move_caret_up(Caret, Buffer)}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_DOWN}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	{noreply, State#state{caret = move_caret_down(Caret, Buffer)}};
+handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, #state{caret = #caret{column = Column} = Caret} = State) ->
 	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, [Char], CaretPos}),
+	gen_server:cast(data_buffer, {char, [Char], Caret}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	{noreply, State#state{caret_pos = CaretPos + 1}};
+	{noreply, State#state{caret = Caret#caret{column = Column + 1}}};
 handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
 	{noreply, State}.
@@ -106,18 +113,18 @@ create_window() ->
 	#main_window{window = Window, status_bar = StatusBar}.
 
 handle_paint(#wx{obj = Window}, _WxObject) ->
-	{Buffer, CaretPos} = gen_server:call(gui, {get_buffer}),
-	draw_buffer(Window, Buffer, CaretPos),
+	{Buffer, Caret} = gen_server:call(gui, {get_buffer}),
+	draw_buffer(Window, Buffer, Caret),
 	ok.
 
-draw_buffer(Window, Buffer, CaretPos) ->
+draw_buffer(Window, Buffer, Caret) ->
 	DC = wxPaintDC:new(Window),
 	ok = wxDC:setBackground(DC, ?wxWHITE_BRUSH),
 	Font = wxFont:new(10, ?wxFONTFAMILY_TELETYPE, ?wxFONTSTYLE_NORMAL, ?wxFONTWEIGHT_NORMAL),
 	ok = wxDC:setFont(DC, Font),
 	ok = wxDC:clear(DC),
 	ok = draw_buffer_lines(DC, Buffer),
-	ok = draw_caret(DC, Buffer, CaretPos),
+	ok = draw_caret(DC, Buffer, Caret),
 	wxFont:destroy(Font),
 	wxPaintDC:destroy(DC),
 	ok.
@@ -139,12 +146,9 @@ draw_buffer_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y) ->
 draw_buffer_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
 	draw_buffer_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
 
-draw_caret(_DC, [], _CaretPos) ->
-	ok;
-draw_caret(DC, [#buffer_line{num = Number, data = Data}|_], CaretPos) when CaretPos < length(Data) ->
-	draw_caret_on_line(DC, lists:sublist(Data, CaretPos), [], 0, Number * 20);
-draw_caret(DC, [#buffer_line{data = Data}|T], CaretPos) ->
-	draw_caret(DC, T, CaretPos - length(Data)).
+draw_caret(DC, Buffer, #caret{line = Line, column = Column}) ->
+	#buffer_line{num = Number, data = Data} = lists:nth(Line + 1, Buffer),
+	draw_caret_on_line(DC, lists:sublist(Data, Column), [], 0, Number * 20).
 
 draw_caret_on_line(DC, [], LiteralCharsRev, XStart, Y) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
@@ -156,3 +160,56 @@ draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y) ->
 	draw_caret_on_line(DC, T, [], (((XStart + W) div 50) + 1) * 50, Y);
 draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
 	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
+
+move_caret_left(#caret{line = 0, column = 0} = Caret, _Buffer) ->
+	Caret;
+move_caret_left(#caret{line = Line, column = 0} = Caret, Buffer) ->
+	#buffer_line{data = PreviousLineData} = lists:nth(Line, Buffer),
+	PreviousLineLength = length(PreviousLineData),
+	Caret#caret{line = Line - 1, column = PreviousLineLength - 1};
+move_caret_left(#caret{column = Column} = Caret, _Buffer) ->
+	Caret#caret{column = Column - 1}.
+
+move_caret_right(#caret{line = Line, column = Column} = Caret, Buffer)  ->
+	#buffer_line{data = CurrentLineData} = lists:nth(Line + 1, Buffer),
+	CurrentLineLength = length(CurrentLineData),
+	case Column < CurrentLineLength - 1 of
+		true ->
+			Caret#caret{column = Column + 1};
+		_ ->
+			move_caret_right_to_next_line(Caret, length(Buffer))
+	end.
+
+move_caret_right_to_next_line(#caret{line = Line} = Caret, NumLines) when Line < NumLines - 1 ->
+	Caret#caret{line = Line + 1, column = 0};
+move_caret_right_to_next_line(Caret, _NumLines) ->
+	Caret.
+	
+move_caret_up(#caret{line = 0} = Caret, _Buffer) ->
+	Caret#caret{column = 0};
+move_caret_up(#caret{line = Line, column = Column} = Caret, Buffer) ->
+	#buffer_line{data = PreviousLineData} = lists:nth(Line, Buffer),
+	PreviousLineLength = length(PreviousLineData),
+	case Column > PreviousLineLength - 1 of
+		true ->
+			Caret#caret{line = Line - 1, column = PreviousLineLength - 1};
+		_ ->
+			Caret#caret{line = Line - 1}
+	end.
+
+move_caret_down(#caret{line = Line} = Caret, Buffer) ->
+	case Line =:= length(Buffer) - 1 of
+		true ->
+			#buffer_line{data = CurrentLineData} = lists:nth(Line + 1, Buffer),
+			CurrentLineLength = length(CurrentLineData),
+			Caret#caret{column = CurrentLineLength - 1};
+		_ ->
+			#buffer_line{data = NextLineData} = lists:nth(Line + 2, Buffer),
+			NextLineLength = length(NextLineData),
+			move_caret_down_to_next_line(Caret, NextLineLength)
+	end.
+
+move_caret_down_to_next_line(#caret{line = Line, column = Column} = Caret, NextLineLength) when Column > NextLineLength - 1 ->
+	Caret#caret{line = Line + 1, column = NextLineLength - 1};
+move_caret_down_to_next_line(#caret{line = Line} = Caret, _NextLineLength) ->
+	Caret#caret{line = Line + 1}.

@@ -61,8 +61,8 @@ handle_cast(display, #state{buffer = Buffer} = State) ->
 handle_cast({get_buffer, Pid}, #state{buffer = Buffer} = State) ->
 	gen_server:cast(Pid, {buffer, Buffer}),
 	{noreply, State};
-handle_cast({char, Char, Pos}, #state{buffer = Buffer} = State) ->
-	{noreply, State#state{buffer = insert_text(Buffer, Char, Pos)}};
+handle_cast({char, Char, Caret}, #state{buffer = Buffer} = State) ->
+	{noreply, State#state{buffer = insert_text(Buffer, Char, Caret)}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
@@ -76,11 +76,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-insert_text([#buffer_line{data = Data} = Line|T], Text, Pos) when Pos < length(Data) ->
-	{A, B} = lists:split(Pos, Data),
+insert_text([#buffer_line{num = LineNo, data = Data} = Line|T], Text, #caret{line = LineNo, column = Column}) ->
+	{A, B} = lists:split(Column, Data),
 	[Line#buffer_line{data = A ++ (Text ++ B)}|T];
-insert_text([#buffer_line{data = Data} = Line|T], Text, Pos) ->
-	[Line|insert_text(T, Text, Pos - length(Data))].
+insert_text([Line|T], Text, Caret) ->
+	%% TODO: Tail recursion.
+	[Line|insert_text(T, Text, Caret)].
 
 split_buffer(Buffer) ->
 	split_buffer_loop(Buffer, 0, [], []).
