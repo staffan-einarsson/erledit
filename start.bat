@@ -1,6 +1,2 @@
-rem @echo off
-
-call rebar clean
-call rebar compile
-
+@echo off
 erl -pa ebin -run erledit
