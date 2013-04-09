@@ -5,6 +5,9 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--include("ee_buffer.hrl").
+-record(ee_buffer_line, {num = 0, data = []}).
+-record(ee_buffer, {lines = []}).
 
--record(caret, {line = 0, column = 0}).
+-define(ASCII_TAB, 9).
+-define(ASCII_LF, 10).
+-define(ASCII_CR, 13).

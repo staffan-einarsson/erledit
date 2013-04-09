@@ -19,7 +19,7 @@
 
 -include("ee_document.hrl").
 
--record(state, {buffer=[], subscribers=[]}).
+-record(state, {buffer}).
 
 %%%===================================================================
 %%% API
@@ -43,11 +43,9 @@ start_link(Args) ->
 init(Args) ->
 	{filename, FileName} = proplists:lookup(filename, Args),
 	{ok, File} = file:open(FileName, [read]),
-	{ok, Buffer = [_|_]} = file:read(File, 100000),
+	{ok, String = [_|_]} = file:read(File, 100000),
 	ok = file:close(File),
-	LineStructs = split_buffer(Buffer),
-	%io:format("~p~n", [LineStructs]),
-	{ok, #state{buffer = LineStructs}}.
+	{ok, #state{buffer = ee_buffer:create_from_string(String)}}.
 
 terminate(_Reason, _State) ->
 	ok.
@@ -61,8 +59,8 @@ handle_cast(display, #state{buffer = Buffer} = State) ->
 handle_cast({get_buffer, Pid}, #state{buffer = Buffer} = State) ->
 	gen_server:cast(Pid, {buffer, Buffer}),
 	{noreply, State};
-handle_cast({char, Char, Caret}, #state{buffer = Buffer} = State) ->
-	{noreply, State#state{buffer = insert_text(Buffer, Char, Caret)}};
+handle_cast({char, Char, #caret{line = LineNo, column = ColNo}}, #state{buffer = Buffer} = State) ->
+	{noreply, State#state{buffer = ee_buffer:insert_text(Buffer, Char, LineNo, ColNo)}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
@@ -75,22 +73,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-insert_text([#buffer_line{num = LineNo, data = Data} = Line|T], Text, #caret{line = LineNo, column = Column}) ->
-	{A, B} = lists:split(Column, Data),
-	[Line#buffer_line{data = A ++ (Text ++ B)}|T];
-insert_text([Line|T], Text, Caret) ->
-	%% TODO: Tail recursion.
-	[Line|insert_text(T, Text, Caret)].
-
-split_buffer(Buffer) ->
-	split_buffer_loop(Buffer, 0, [], []).
-
-split_buffer_loop([], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
-	lists:reverse([#buffer_line{num = CurrentLineNo, data = lists:reverse(CurrentLineBufferRev)}|PrevLinesRev]);
-split_buffer_loop([?ASCII_LF|T], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
-	split_buffer_loop(T, CurrentLineNo + 1, [], [#buffer_line{num = CurrentLineNo, data = lists:reverse([?ASCII_LF|CurrentLineBufferRev])}|PrevLinesRev]);
-split_buffer_loop([?ASCII_CR, ?ASCII_LF|T], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
-	split_buffer_loop(T, CurrentLineNo + 1, [], [#buffer_line{num = CurrentLineNo, data = lists:reverse([?ASCII_LF, ?ASCII_CR|CurrentLineBufferRev])}|PrevLinesRev]);
-split_buffer_loop([Char|T], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
-	split_buffer_loop(T, CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev).

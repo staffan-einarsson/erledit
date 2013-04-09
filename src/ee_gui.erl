@@ -23,7 +23,7 @@
 -include("ee_document.hrl").
 
 -record(main_window, {window, status_bar}).
--record(state, {win = #main_window{}, buffer = [], caret = #caret{}}).
+-record(state, {win = #main_window{}, buffer, caret = #caret{}}).
 
 %% ===================================================================
 %% API
@@ -129,11 +129,12 @@ draw_buffer(Window, Buffer, Caret) ->
 	wxPaintDC:destroy(DC),
 	ok.
 
-draw_buffer_lines(_DC, []) ->
-	ok;
-draw_buffer_lines(DC, [#buffer_line{num = Number, data = Data}|T]) ->
-	ok = draw_buffer_line(DC, Data, [], 0, Number * 20),
-	draw_buffer_lines(DC, T).
+draw_buffer_lines(DC, Buffer) ->
+	ee_buffer:foreach_line(Buffer, fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, ee_buffer:get_line_number(Line) * 20) end).
+	% ok;
+% draw_buffer_lines(DC, [#buffer_line{num = Number, data = Data}|T]) ->
+	% ok = draw_buffer_line(DC, Data, [], 0, Number * 20),
+	% draw_buffer_lines(DC, T).
 
 draw_buffer_line(DC, [], LiteralCharsRev, XStart, Y) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
@@ -146,9 +147,9 @@ draw_buffer_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y) ->
 draw_buffer_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
 	draw_buffer_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
 
-draw_caret(DC, Buffer, #caret{line = Line, column = Column}) ->
-	#buffer_line{num = Number, data = Data} = lists:nth(Line + 1, Buffer),
-	draw_caret_on_line(DC, lists:sublist(Data, Column), [], 0, Number * 20).
+draw_caret(DC, Buffer, #caret{line = LineNo, column = Column}) ->
+	Line = ee_buffer:get_line(Buffer, LineNo + 1),
+	draw_caret_on_line(DC, lists:sublist(ee_buffer:get_line_contents(Line), Column), [], 0, ee_buffer:get_line_number(Line) * 20).
 
 draw_caret_on_line(DC, [], LiteralCharsRev, XStart, Y) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
@@ -163,21 +164,17 @@ draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
 
 move_caret_left(#caret{line = 0, column = 0} = Caret, _Buffer) ->
 	Caret;
-move_caret_left(#caret{line = Line, column = 0} = Caret, Buffer) ->
-	#buffer_line{data = PreviousLineData} = lists:nth(Line, Buffer),
-	PreviousLineLength = length(PreviousLineData),
-	Caret#caret{line = Line - 1, column = PreviousLineLength - 1};
+move_caret_left(#caret{line = LineNo, column = 0} = Caret, Buffer) ->
+	Caret#caret{line = LineNo - 1, column = ee_buffer:get_line_length(Buffer, LineNo) - 1};
 move_caret_left(#caret{column = Column} = Caret, _Buffer) ->
 	Caret#caret{column = Column - 1}.
 
-move_caret_right(#caret{line = Line, column = Column} = Caret, Buffer)  ->
-	#buffer_line{data = CurrentLineData} = lists:nth(Line + 1, Buffer),
-	CurrentLineLength = length(CurrentLineData),
-	case Column < CurrentLineLength - 1 of
+move_caret_right(#caret{line = LineNo, column = Column} = Caret, Buffer)  ->
+	case Column < ee_buffer:get_line_length(Buffer, LineNo + 1) - 1 of
 		true ->
 			Caret#caret{column = Column + 1};
 		_ ->
-			move_caret_right_to_next_line(Caret, length(Buffer))
+			move_caret_right_to_next_line(Caret, ee_buffer:get_num_lines(Buffer))
 	end.
 
 move_caret_right_to_next_line(#caret{line = Line} = Caret, NumLines) when Line < NumLines - 1 ->
@@ -187,26 +184,21 @@ move_caret_right_to_next_line(Caret, _NumLines) ->
 	
 move_caret_up(#caret{line = 0} = Caret, _Buffer) ->
 	Caret#caret{column = 0};
-move_caret_up(#caret{line = Line, column = Column} = Caret, Buffer) ->
-	#buffer_line{data = PreviousLineData} = lists:nth(Line, Buffer),
-	PreviousLineLength = length(PreviousLineData),
+move_caret_up(#caret{line = LineNo, column = Column} = Caret, Buffer) ->
+	PreviousLineLength = ee_buffer:get_line_length(Buffer, LineNo),
 	case Column > PreviousLineLength - 1 of
 		true ->
-			Caret#caret{line = Line - 1, column = PreviousLineLength - 1};
+			Caret#caret{line = LineNo - 1, column = PreviousLineLength - 1};
 		_ ->
-			Caret#caret{line = Line - 1}
+			Caret#caret{line = LineNo - 1}
 	end.
 
-move_caret_down(#caret{line = Line} = Caret, Buffer) ->
-	case Line =:= length(Buffer) - 1 of
+move_caret_down(#caret{line = LineNo} = Caret, Buffer) ->
+	case LineNo =:= ee_buffer:get_num_lines(Buffer) - 1 of
 		true ->
-			#buffer_line{data = CurrentLineData} = lists:nth(Line + 1, Buffer),
-			CurrentLineLength = length(CurrentLineData),
-			Caret#caret{column = CurrentLineLength - 1};
+			Caret#caret{column = ee_buffer:get_line_length(Buffer, LineNo + 1) - 1};
 		_ ->
-			#buffer_line{data = NextLineData} = lists:nth(Line + 2, Buffer),
-			NextLineLength = length(NextLineData),
-			move_caret_down_to_next_line(Caret, NextLineLength)
+			move_caret_down_to_next_line(Caret, ee_buffer:get_line_length(Buffer, LineNo + 2))
 	end.
 
 move_caret_down_to_next_line(#caret{line = Line, column = Column} = Caret, NextLineLength) when Column > NextLineLength - 1 ->
