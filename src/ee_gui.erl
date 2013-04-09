@@ -130,11 +130,9 @@ draw_buffer(Window, Buffer, Caret) ->
 	ok.
 
 draw_buffer_lines(DC, Buffer) ->
-	ee_buffer:foreach_line(Buffer, fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, ee_buffer:get_line_number(Line) * 20) end).
-	% ok;
-% draw_buffer_lines(DC, [#buffer_line{num = Number, data = Data}|T]) ->
-	% ok = draw_buffer_line(DC, Data, [], 0, Number * 20),
-	% draw_buffer_lines(DC, T).
+	ee_buffer:foreach_line(Buffer,
+		fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, ee_buffer:get_line_number(Line) * 20) end
+		).
 
 draw_buffer_line(DC, [], LiteralCharsRev, XStart, Y) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
