@@ -163,12 +163,12 @@ draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
 move_caret_left(#caret{line = 0, column = 0} = Caret, _Buffer) ->
 	Caret;
 move_caret_left(#caret{line = LineNo, column = 0} = Caret, Buffer) ->
-	Caret#caret{line = LineNo - 1, column = ee_buffer:get_line_length(Buffer, LineNo) - 1};
+	Caret#caret{line = LineNo - 1, column = ee_buffer:get_line_length(Buffer, LineNo)};
 move_caret_left(#caret{column = Column} = Caret, _Buffer) ->
 	Caret#caret{column = Column - 1}.
 
 move_caret_right(#caret{line = LineNo, column = Column} = Caret, Buffer)  ->
-	case Column < ee_buffer:get_line_length(Buffer, LineNo + 1) - 1 of
+	case Column < ee_buffer:get_line_length(Buffer, LineNo + 1) of
 		true ->
 			Caret#caret{column = Column + 1};
 		_ ->
@@ -184,9 +184,9 @@ move_caret_up(#caret{line = 0} = Caret, _Buffer) ->
 	Caret#caret{column = 0};
 move_caret_up(#caret{line = LineNo, column = Column} = Caret, Buffer) ->
 	PreviousLineLength = ee_buffer:get_line_length(Buffer, LineNo),
-	case Column > PreviousLineLength - 1 of
+	case Column > PreviousLineLength of
 		true ->
-			Caret#caret{line = LineNo - 1, column = PreviousLineLength - 1};
+			Caret#caret{line = LineNo - 1, column = PreviousLineLength};
 		_ ->
 			Caret#caret{line = LineNo - 1}
 	end.
@@ -194,12 +194,12 @@ move_caret_up(#caret{line = LineNo, column = Column} = Caret, Buffer) ->
 move_caret_down(#caret{line = LineNo} = Caret, Buffer) ->
 	case LineNo =:= ee_buffer:get_num_lines(Buffer) - 1 of
 		true ->
-			Caret#caret{column = ee_buffer:get_line_length(Buffer, LineNo + 1) - 1};
+			Caret#caret{column = ee_buffer:get_line_length(Buffer, LineNo + 1)};
 		_ ->
 			move_caret_down_to_next_line(Caret, ee_buffer:get_line_length(Buffer, LineNo + 2))
 	end.
 
-move_caret_down_to_next_line(#caret{line = Line, column = Column} = Caret, NextLineLength) when Column > NextLineLength - 1 ->
-	Caret#caret{line = Line + 1, column = NextLineLength - 1};
+move_caret_down_to_next_line(#caret{line = Line, column = Column} = Caret, NextLineLength) when Column > NextLineLength ->
+	Caret#caret{line = Line + 1, column = NextLineLength};
 move_caret_down_to_next_line(#caret{line = Line} = Caret, _NextLineLength) ->
 	Caret#caret{line = Line + 1}.
