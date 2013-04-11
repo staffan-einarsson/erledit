@@ -5,7 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--record(ee_buffer_line, {num = 0, data = []}).
+-record(ee_buffer_line, {line_no = 0, contents = []}).
 -record(ee_buffer, {lines = []}).
 
 -define(ASCII_TAB, 9).
