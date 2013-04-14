@@ -79,6 +79,10 @@ handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_UP}}, #state{win = #m
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_DOWN}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
 	wxFrame:refresh(Window),
 	{noreply, State#state{caret = move_caret_down(Caret, Buffer)}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RETURN}}, #state{caret = #caret{line = Line} = Caret} = State) ->
+	gen_server:cast(data_buffer, {eol, Caret}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	{noreply, State#state{caret = Caret#caret{line = Line + 1, column = 0}}};
 handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, #state{caret = #caret{column = Column} = Caret} = State) ->
 	%% Send message to data buffer to update.
 	gen_server:cast(data_buffer, {char, [Char], Caret}),

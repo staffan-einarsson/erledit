@@ -10,9 +10,15 @@
 %% API
 -export([new/0,	create_from_string/1, insert_text/4, get_line/2,
 	get_line_number/1, get_line_contents/1, get_line_length/2,
-	get_line_length/1, get_num_lines/1, foreach_line/2]).
+	get_line_length/1, get_num_lines/1, foreach_line/2,
+	insert_eol/3]).
 
 -include("ee_buffer.hrl").
+-ifdef(debug).
+-define(dbg_print(Term), erlang:apply(fun() -> Val = Term, io:format("dbg_print: ~p, ~p: ~p~n", [?FILE, ?LINE, Val]), Val end, [])).
+-else.
+-define(dbg_print(Term), Term).
+-endif.
 
 %% ===================================================================
 %% API
@@ -26,6 +32,9 @@ create_from_string(String) ->
 
 insert_text(#ee_buffer{lines = Lines} = Buffer, Text, LineNo, ColNo) ->
 	Buffer#ee_buffer{lines = insert_text_(Lines, Text, LineNo, ColNo)}.
+
+insert_eol(#ee_buffer{lines = Lines} = Buffer, LineNo, ColNo) ->
+	Buffer#ee_buffer{lines = ?dbg_print(insert_eol_(Lines, LineNo, ColNo))}.
 
 get_line(#ee_buffer{lines = Lines}, LineNo) ->
 	lists:nth(LineNo, Lines).
@@ -70,3 +79,13 @@ insert_text_([#ee_buffer_line{line_no = LineNo, contents = Contents} = Line|T], 
 insert_text_([Line|T], Text, LineNo, ColNo) ->
 	%% TODO: Tail recursion.
 	[Line|insert_text_(T, Text, LineNo, ColNo)].
+
+insert_eol_([], _, _) ->
+	[];
+insert_eol_([#ee_buffer_line{line_no = LineNo} = Line|T], CaretLineNo, CaretColNo) when LineNo > CaretLineNo ->
+	[Line#ee_buffer_line{line_no = LineNo + 1}|insert_eol_(T, CaretLineNo, CaretColNo)];
+insert_eol_([#ee_buffer_line{line_no = CaretLineNo, contents = Contents, eol = Eol} = Line|T], CaretLineNo, CaretColNo) ->
+	{A, B} = lists:split(CaretColNo, Contents),
+	[Line#ee_buffer_line{contents = A, eol = eol_lf}, Line#ee_buffer_line{line_no = CaretLineNo + 1, contents = B, eol = Eol}|insert_eol_(T, CaretLineNo, CaretColNo)];
+insert_eol_([#ee_buffer_line{} = Line|T], CaretLineNo, CaretColNo) ->
+	[Line|insert_eol_(T, CaretLineNo, CaretColNo)].
