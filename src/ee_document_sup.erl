@@ -14,6 +14,8 @@
 %% Supervisor callbacks
 -export([init/1]).
 
+-include("ee_global.hrl").
+
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
 

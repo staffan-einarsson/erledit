@@ -13,12 +13,8 @@
 	get_line_length/1, get_num_lines/1, foreach_line/2,
 	insert_eol/3]).
 
+-include("ee_global.hrl").
 -include("ee_buffer.hrl").
--ifdef(debug).
--define(dbg_print(Term), erlang:apply(fun() -> Val = Term, io:format("dbg_print: ~p, ~p: ~p~n", [?FILE, ?LINE, Val]), Val end, [])).
--else.
--define(dbg_print(Term), Term).
--endif.
 
 %% ===================================================================
 %% API

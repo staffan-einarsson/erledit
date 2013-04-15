@@ -19,8 +19,10 @@
 
 %-compile(export_all).
 
+-include("ee_global.hrl").
 -include_lib("wx/include/wx.hrl").
 -include("ee_document.hrl").
+-include("ee_buffer.hrl").
 
 -record(main_window, {window, status_bar}).
 -record(state, {win = #main_window{}, buffer, caret = #caret{}}).
