@@ -85,6 +85,14 @@ handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RETURN}}, #state{care
 	gen_server:cast(data_buffer, {eol, Caret}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
 	{noreply, State#state{caret = Caret#caret{line = Line + 1, column = 0}}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_BACK}}, #state{buffer = Buffer, caret = Caret} = State) ->
+	gen_server:cast(data_buffer, {delete_left, Caret}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	{noreply, State#state{caret = move_caret_left(Caret, Buffer)}};	
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_DELETE}}, #state{caret = Caret} = State) ->
+	gen_server:cast(data_buffer, {delete_right, Caret}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	{noreply, State};	
 handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, #state{caret = #caret{column = Column} = Caret} = State) ->
 	%% Send message to data buffer to update.
 	gen_server:cast(data_buffer, {char, [Char], Caret}),
