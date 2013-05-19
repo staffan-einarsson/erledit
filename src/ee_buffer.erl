@@ -107,7 +107,7 @@ remove_left_(Lines, 0, 0) ->
 remove_left_([#ee_buffer_line{contents = ContentsFirst}, #ee_buffer_line{line_no = CaretLineNo, contents = ContentsSecond, eol = Eol}|T], CaretLineNo, 0) ->
 	[#ee_buffer_line{line_no = CaretLineNo - 1, contents = ContentsFirst ++ ContentsSecond, eol = Eol}|add_to_line_no(T, -1)];
 %% A char is being removed.
-remove_left_([#ee_buffer_line{line_no = CaretLineNo, contents = Contents, eol = Eol} = Line|T], CaretLineNo, CaretColNo) ->
+remove_left_([#ee_buffer_line{line_no = CaretLineNo, contents = Contents} = Line|T], CaretLineNo, CaretColNo) ->
 	{A, [_|B]} = lists:split(CaretColNo - 1, Contents),
 	NewContents = A ++ B,
 	[Line#ee_buffer_line{contents = NewContents}|T];
@@ -118,10 +118,10 @@ remove_left_([#ee_buffer_line{} = Line|T], CaretLineNo, CaretColNo) ->
 remove_right_(Lines, CaretLineNo, CaretColNo, LastLineLength) when CaretLineNo == length(Lines) - 1, CaretColNo == LastLineLength ->
 	Lines;
 %% An eol is being removed.
-remove_right_([#ee_buffer_line{line_no = CaretLineNo, contents = ContentsFirst, eol = Eol}, #ee_buffer_line{contents = ContentsSecond, eol = Eol}|T], CaretLineNo, CaretColNo, _) when CaretColNo == length(ContentsFirst) ->
+remove_right_([#ee_buffer_line{line_no = CaretLineNo, contents = ContentsFirst}, #ee_buffer_line{contents = ContentsSecond, eol = Eol}|T], CaretLineNo, CaretColNo, _) when CaretColNo == length(ContentsFirst) ->
 	[#ee_buffer_line{line_no = CaretLineNo, contents = ContentsFirst ++ ContentsSecond, eol = Eol}|add_to_line_no(T, -1)];
 %% A char is being removed.
-remove_right_([#ee_buffer_line{line_no = CaretLineNo, contents = Contents, eol = Eol} = Line|T], CaretLineNo, CaretColNo, _) ->
+remove_right_([#ee_buffer_line{line_no = CaretLineNo, contents = Contents} = Line|T], CaretLineNo, CaretColNo, _) ->
 	{A, [_|B]} = lists:split(CaretColNo, Contents),
 	NewContents = A ++ B,
 	[Line#ee_buffer_line{contents = NewContents}|T];

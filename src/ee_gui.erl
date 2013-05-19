@@ -81,6 +81,12 @@ handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_UP}}, #state{win = #m
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_DOWN}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
 	wxFrame:refresh(Window),
 	{noreply, State#state{caret = move_caret_down(Caret, Buffer)}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_HOME}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	{noreply, State#state{caret = move_caret_to_beginning_of_line(Caret, Buffer)}};
+handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_END}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	{noreply, State#state{caret = move_caret_to_end_of_line(Caret, Buffer)}};
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RETURN}}, #state{caret = #caret{line = Line} = Caret} = State) ->
 	gen_server:cast(data_buffer, {eol, Caret}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
@@ -217,3 +223,9 @@ move_caret_down_to_next_line(#caret{line = Line, column = Column} = Caret, NextL
 	Caret#caret{line = Line + 1, column = NextLineLength};
 move_caret_down_to_next_line(#caret{line = Line} = Caret, _NextLineLength) ->
 	Caret#caret{line = Line + 1}.
+
+move_caret_to_beginning_of_line(#caret{} = Caret, _) ->
+	Caret#caret{column = 0}.
+
+move_caret_to_end_of_line(#caret{line = LineNo} = Caret, Buffer) ->
+	Caret#caret{column = ee_buffer:get_line_length(Buffer, LineNo + 1)}.

@@ -5,6 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
+%% eol can be eol_lf, eol_crlf, or none
 -record(ee_buffer_line, {line_no = 0, contents = [], eol = none}).
 -record(ee_buffer, {lines = []}).
 
