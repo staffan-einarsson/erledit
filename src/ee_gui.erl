@@ -96,7 +96,7 @@ handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_PAGEDOWN}}, #state{wi
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RETURN}}, #state{caret = #caret{line = Line} = Caret} = State) ->
 	gen_server:cast(data_buffer, {eol, Caret}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	{noreply, State#state{caret = Caret#caret{line = Line + 1, column = 0}}};
+	{noreply, State#state{caret = Caret#caret{line = Line + 1, column = 1}}};
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_BACK}}, #state{buffer = Buffer, caret = Caret} = State) ->
 	gen_server:cast(data_buffer, {delete_left, Caret}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
@@ -157,7 +157,7 @@ draw_buffer(Window, Buffer, Caret) ->
 
 draw_buffer_lines(DC, Buffer) ->
 	ee_buffer:foreach_line(Buffer,
-		fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, ee_buffer:get_line_number(Line) * 20) end
+		fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, (ee_buffer:get_line_number(Line) - 1) * 20) end
 		).
 
 draw_buffer_line(DC, [], LiteralCharsRev, XStart, Y) ->
@@ -172,8 +172,8 @@ draw_buffer_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
 	draw_buffer_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
 
 draw_caret(DC, Buffer, #caret{line = LineNo, column = Column}) ->
-	Line = ee_buffer:get_line(Buffer, LineNo + 1),
-	draw_caret_on_line(DC, lists:sublist(ee_buffer:get_line_contents(Line), Column), [], 0, ee_buffer:get_line_number(Line) * 20).
+	Line = ee_buffer:get_line(Buffer, LineNo),
+	draw_caret_on_line(DC, lists:sublist(ee_buffer:get_line_contents(Line), Column - 1), [], 0, (LineNo - 1) * 20).
 
 draw_caret_on_line(DC, [], LiteralCharsRev, XStart, Y) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
@@ -186,36 +186,36 @@ draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y) ->
 draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
 	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
 
-move_caret_left(#caret{line = 0, column = 0} = Caret, _Buffer) ->
+move_caret_left(#caret{line = 1, column = 1} = Caret, _Buffer) ->
 	Caret;
-move_caret_left(#caret{line = LineNo, column = 0} = Caret, Buffer) ->
-	Caret#caret{line = LineNo - 1, column = ee_buffer:get_line_length(Buffer, LineNo)};
+move_caret_left(#caret{line = LineNo, column = 1} = Caret, Buffer) ->
+	Caret#caret{line = LineNo - 1, column = ee_buffer:get_line_length(Buffer, LineNo - 1) + 1};
 move_caret_left(#caret{column = Column} = Caret, _Buffer) ->
 	Caret#caret{column = Column - 1}.
 
 move_caret_right(#caret{line = LineNo, column = Column} = Caret, Buffer)  ->
-	case Column < ee_buffer:get_line_length(Buffer, LineNo + 1) of
+	case Column =< ee_buffer:get_line_length(Buffer, LineNo) of
 		true ->
 			Caret#caret{column = Column + 1};
 		_ ->
 			move_caret_right_to_next_line(Caret, ee_buffer:get_num_lines(Buffer))
 	end.
 
-move_caret_right_to_next_line(#caret{line = Line} = Caret, NumLines) when Line < NumLines - 1 ->
-	Caret#caret{line = Line + 1, column = 0};
+move_caret_right_to_next_line(#caret{line = LineNo} = Caret, NumLines) when LineNo < NumLines ->
+	Caret#caret{line = LineNo + 1, column = 1};
 move_caret_right_to_next_line(Caret, _NumLines) ->
 	Caret.
 	
 move_caret_up(Caret, Buffer) ->
 	move_caret_up(Caret, 1, Buffer).
 	
-move_caret_up(#caret{line = LineNo} = Caret, NumLinesToMove, _Buffer) when LineNo < NumLinesToMove ->
-	Caret#caret{column = 0};
+move_caret_up(#caret{line = LineNo} = Caret, NumLinesToMove, _Buffer) when LineNo =< NumLinesToMove ->
+	Caret#caret{line = 1, column = 1};
 move_caret_up(#caret{line = LineNo, column = Column} = Caret, NumLinesToMove, Buffer) ->
-	TargetLineLength = ee_buffer:get_line_length(Buffer, LineNo - NumLinesToMove + 1),
-	case Column > TargetLineLength of
+	TargetLineLength = ee_buffer:get_line_length(Buffer, LineNo - NumLinesToMove),
+	case Column >= TargetLineLength of
 		true ->
-			Caret#caret{line = LineNo - NumLinesToMove, column = TargetLineLength};
+			Caret#caret{line = LineNo - NumLinesToMove, column = TargetLineLength + 1};
 		_ ->
 			Caret#caret{line = LineNo - NumLinesToMove}
 	end.
@@ -225,23 +225,23 @@ move_caret_down(Caret, Buffer) ->
 
 move_caret_down(#caret{line = LineNo} = Caret, NumLinesToMove, Buffer) ->
 	NumLines = ee_buffer:get_num_lines(Buffer),
-	case LineNo + NumLinesToMove >= NumLines of
+	case LineNo + NumLinesToMove > NumLines of
 		true ->
-			Caret#caret{line = NumLines - 1, column = ee_buffer:get_line_length(Buffer, NumLines)};
+			Caret#caret{line = NumLines, column = ee_buffer:get_line_length(Buffer, NumLines) + 1};
 		_ ->
-			move_caret_down_and_truncate(Caret, NumLinesToMove, ee_buffer:get_line_length(Buffer, LineNo + NumLinesToMove + 1))
+			move_caret_down_and_truncate(Caret, NumLinesToMove, ee_buffer:get_line_length(Buffer, LineNo + NumLinesToMove))
 	end.
 
-move_caret_down_and_truncate(#caret{line = Line, column = Column} = Caret, NumLinesToMove, NextLineLength) when Column > NextLineLength ->
-	Caret#caret{line = Line + NumLinesToMove, column = NextLineLength};
-move_caret_down_and_truncate(#caret{line = Line} = Caret, NumLinesToMove, _NextLineLength) ->
-	Caret#caret{line = Line + NumLinesToMove}.
+move_caret_down_and_truncate(#caret{line = LineNo, column = Column} = Caret, NumLinesToMove, NextLineLength) when Column > NextLineLength + 1 ->
+	Caret#caret{line = LineNo + NumLinesToMove, column = NextLineLength + 1};
+move_caret_down_and_truncate(#caret{line = LineNo} = Caret, NumLinesToMove, _NextLineLength) ->
+	Caret#caret{line = LineNo + NumLinesToMove}.
 
 move_caret_to_beginning_of_line(#caret{} = Caret, _) ->
-	Caret#caret{column = 0}.
+	Caret#caret{column = 1}.
 
 move_caret_to_end_of_line(#caret{line = LineNo} = Caret, Buffer) ->
-	Caret#caret{column = ee_buffer:get_line_length(Buffer, LineNo + 1)}.
+	Caret#caret{column = ee_buffer:get_line_length(Buffer, LineNo) + 1}.
 
 move_caret_up_one_page(Caret, Buffer) ->
 	%% Let's pretend one page is 10 lines for now.
