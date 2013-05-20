@@ -148,44 +148,44 @@ draw_buffer(Window, Buffer, Caret) ->
 	ok = wxDC:setBackground(DC, ?wxWHITE_BRUSH),
 	Font = wxFont:new(10, ?wxFONTFAMILY_TELETYPE, ?wxFONTSTYLE_NORMAL, ?wxFONTWEIGHT_NORMAL),
 	ok = wxDC:setFont(DC, Font),
-	{_, LineHeight} = wxDC:getTextExtent(DC, " "),
+	{SpaceWidth, LineHeight} = wxDC:getTextExtent(DC, " "),
 	ok = wxDC:clear(DC),
-	ok = draw_buffer_lines(DC, Buffer, LineHeight),
-	ok = draw_caret(DC, Buffer, Caret, LineHeight),
+	ok = draw_buffer_lines(DC, Buffer, LineHeight, SpaceWidth),
+	ok = draw_caret(DC, Buffer, Caret, LineHeight, SpaceWidth),
 	wxFont:destroy(Font),
 	wxPaintDC:destroy(DC),
 	ok.
 
-draw_buffer_lines(DC, Buffer, LineHeight) ->
+draw_buffer_lines(DC, Buffer, LineHeight, SpaceWidth) ->
 	ee_buffer:foreach_line(Buffer,
-		fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, (ee_buffer:get_line_number(Line) - 1) * LineHeight) end
+		fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, (ee_buffer:get_line_number(Line) - 1) * LineHeight, SpaceWidth) end
 		).
 
-draw_buffer_line(DC, [], LiteralCharsRev, XStart, Y) ->
+draw_buffer_line(DC, [], LiteralCharsRev, XStart, Y, _) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
 	ok = wxDC:drawText(DC, LiteralChars, {XStart, Y});
-draw_buffer_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y) ->
+draw_buffer_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y, SpaceWidth) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
 	{W, _} = wxDC:getTextExtent(DC, LiteralChars),
 	ok = wxDC:drawText(DC, LiteralChars, {XStart, Y}),
-	draw_buffer_line(DC, T, [], (((XStart + W) div 50) + 1) * 50, Y);
-draw_buffer_line(DC, [Char|T], LiteralCharsRev, XStart, Y) ->
-	draw_buffer_line(DC, T, [Char|LiteralCharsRev], XStart, Y).
+	draw_buffer_line(DC, T, [], (((XStart + W) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth), Y, SpaceWidth);
+draw_buffer_line(DC, [Char|T], LiteralCharsRev, XStart, Y, SpaceWidth) ->
+	draw_buffer_line(DC, T, [Char|LiteralCharsRev], XStart, Y, SpaceWidth).
 
-draw_caret(DC, Buffer, #caret{line = LineNo, column = Column}, LineHeight) ->
+draw_caret(DC, Buffer, #caret{line = LineNo, column = Column}, LineHeight, SpaceWidth) ->
 	Line = ee_buffer:get_line(Buffer, LineNo),
-	draw_caret_on_line(DC, lists:sublist(ee_buffer:get_line_contents(Line), Column - 1), [], 0, (LineNo - 1) * LineHeight, LineHeight).
+	draw_caret_on_line(DC, lists:sublist(ee_buffer:get_line_contents(Line), Column - 1), [], 0, (LineNo - 1) * LineHeight, LineHeight, SpaceWidth).
 
-draw_caret_on_line(DC, [], LiteralCharsRev, XStart, Y, H) ->
+draw_caret_on_line(DC, [], LiteralCharsRev, XStart, Y, H, _) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
 	{W, _} = ?dbg_print(wxDC:getTextExtent(DC, LiteralChars)),
 	ok = wxDC:drawLine(DC, {XStart + W, Y}, {XStart + W, Y + H});
-draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y, H) ->
+draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y, H, SpaceWidth) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
 	{W, _} = wxDC:getTextExtent(DC, LiteralChars),
-	draw_caret_on_line(DC, T, [], (((XStart + W) div 50) + 1) * 50, Y, H);
-draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y, H) ->
-	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y, H).
+	draw_caret_on_line(DC, T, [], (((XStart + W) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth), Y, H, SpaceWidth);
+draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y, H, SpaceWidth) ->
+	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y, H, SpaceWidth).
 
 move_caret_left(#caret{line = 1, column = 1} = Caret, _Buffer) ->
 	Caret;
