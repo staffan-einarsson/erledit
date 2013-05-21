@@ -19,6 +19,7 @@
 
 -include("ee_global.hrl").
 -include("ee_document.hrl").
+-include("ee_buffer.hrl").
 
 -record(state, {buffer}).
 
@@ -60,14 +61,14 @@ handle_cast(display, #state{buffer = Buffer} = State) ->
 handle_cast({get_buffer, Pid}, #state{buffer = Buffer} = State) ->
 	gen_server:cast(Pid, {buffer, Buffer}),
 	{noreply, State};
-handle_cast({delete_left, #caret{line = LineNo, column = ColNo}}, #state{buffer = Buffer} = State) ->
-	{noreply, State#state{buffer = ee_buffer:remove_left(Buffer, LineNo, ColNo)}};
-handle_cast({delete_right, #caret{line = LineNo, column = ColNo}}, #state{buffer = Buffer} = State) ->
-	{noreply, State#state{buffer = ee_buffer:remove_right(Buffer, LineNo, ColNo)}};
-handle_cast({eol, #caret{line = LineNo, column = ColNo}}, #state{buffer = Buffer} = State) ->
-	{noreply, State#state{buffer = ee_buffer:insert_eol(Buffer, LineNo, ColNo)}};
-handle_cast({char, Char, #caret{line = LineNo, column = ColNo}}, #state{buffer = Buffer} = State) ->
-	{noreply, State#state{buffer = ee_buffer:insert_text(Buffer, Char, LineNo, ColNo)}};
+handle_cast({delete_left, #ee_buffer_coords{} = Coords}, #state{buffer = Buffer} = State) ->
+	{noreply, State#state{buffer = ee_buffer:remove_left(Buffer, Coords)}};
+handle_cast({delete_right, #ee_buffer_coords{} = Coords}, #state{buffer = Buffer} = State) ->
+	{noreply, State#state{buffer = ee_buffer:remove_right(Buffer, Coords)}};
+handle_cast({eol, #ee_buffer_coords{} = Coords}, #state{buffer = Buffer} = State) ->
+	{noreply, State#state{buffer = ee_buffer:insert_eol(Buffer, Coords)}};
+handle_cast({char, Char, #ee_buffer_coords{} = Coords}, #state{buffer = Buffer} = State) ->
+	{noreply, State#state{buffer = ee_buffer:insert_text(Buffer, Char, Coords)}};
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 

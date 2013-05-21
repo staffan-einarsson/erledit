@@ -24,6 +24,7 @@
 -include("ee_document.hrl").
 -include("ee_buffer.hrl").
 
+-record(caret, {line = 1, column = 1}).
 -record(main_window, {window, status_bar}).
 -record(state, {win = #main_window{}, buffer, caret = #caret{}}).
 
@@ -94,21 +95,23 @@ handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_PAGEDOWN}}, #state{wi
 	wxFrame:refresh(Window),
 	{noreply, State#state{caret = move_caret_down_one_page(Caret, Buffer)}};
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RETURN}}, #state{caret = #caret{line = Line} = Caret} = State) ->
-	gen_server:cast(data_buffer, {eol, Caret}),
+	gen_server:cast(data_buffer, {eol, caret_to_buffer_coords(Caret)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
+	%% Don't change caret directly.
 	{noreply, State#state{caret = Caret#caret{line = Line + 1, column = 1}}};
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_BACK}}, #state{buffer = Buffer, caret = Caret} = State) ->
-	gen_server:cast(data_buffer, {delete_left, Caret}),
+	gen_server:cast(data_buffer, {delete_left, caret_to_buffer_coords(Caret)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
 	{noreply, State#state{caret = move_caret_left(Caret, Buffer)}};	
 handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_DELETE}}, #state{caret = Caret} = State) ->
-	gen_server:cast(data_buffer, {delete_right, Caret}),
+	gen_server:cast(data_buffer, {delete_right, caret_to_buffer_coords(Caret)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
 	{noreply, State};	
 handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, #state{caret = #caret{column = Column} = Caret} = State) ->
 	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, [Char], Caret}),
+	gen_server:cast(data_buffer, {char, [Char], caret_to_buffer_coords(Caret)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
+	%% Don't change caret directly.
 	{noreply, State#state{caret = Caret#caret{column = Column + 1}}};
 handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
@@ -251,3 +254,6 @@ move_caret_up_one_page(Caret, Buffer) ->
 move_caret_down_one_page(Caret, Buffer) ->
 	%% Let's pretend one page is 10 lines for now.
 	move_caret_down(Caret, 10, Buffer).
+
+caret_to_buffer_coords(#caret{line = LineNo, column = ColNo}) ->
+	ee_buffer:new_buffer_coords(LineNo, ColNo).
