@@ -70,49 +70,8 @@ handle_cast(Msg, State) ->
 handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
 	wxWindow:destroy(Window),
 	{stop, normal, State};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_LEFT}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_left(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RIGHT}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_right(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_UP}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_up(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_DOWN}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_down(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_HOME}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_to_beginning_of_line(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_END}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_to_end_of_line(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_PAGEUP}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_up_one_page(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_PAGEDOWN}}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{caret = move_caret_down_one_page(Caret, Buffer)}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_RETURN}}, #state{buffer = Buffer, caret = #caret{line = Line} = Caret} = State) ->
-	gen_server:cast(data_buffer, {eol, caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
-	%% Don't change caret directly.
-	{noreply, State#state{caret = Caret#caret{line = Line + 1, column = 1}}};
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_BACK}}, #state{buffer = Buffer, caret = Caret} = State) ->
-	gen_server:cast(data_buffer, {delete_left, caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
-	{noreply, State#state{caret = move_caret_left(Caret, Buffer)}};	
-handle_info(#wx{event = #wxKey{type = char, keyCode = ?WXK_DELETE}}, #state{buffer = Buffer, caret = Caret} = State) ->
-	gen_server:cast(data_buffer, {delete_right, caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
-	{noreply, State};	
-handle_info(#wx{event = #wxKey{type = char, uniChar = Char}}, #state{buffer = Buffer, caret = #caret{column = Column} = Caret} = State) ->
-	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, [Char], caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
-	%% Don't change caret directly.
-	{noreply, State#state{caret = Caret#caret{column = Column + 1}}};
+handle_info(#wx{event = #wxKey{} = KeyEvent}, State) ->
+	{noreply, handle_key(KeyEvent, State)};
 handle_info(Msg, State) ->
 	io:format("~p Got Info ~p~n", [self(), Msg]),
 	{noreply, State}.
@@ -123,6 +82,50 @@ code_change(_OldVsn, State, _Extra) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_left(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_RIGHT}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_right(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_UP}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_up(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_DOWN}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_down(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_HOME}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_to_beginning_of_line(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_END}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_to_end_of_line(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEUP}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_up_one_page(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
+	wxFrame:refresh(Window),
+	State#state{caret = move_caret_down_one_page(Caret, Buffer)};
+handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{buffer = Buffer, caret = #caret{line = Line} = Caret} = State) ->
+	gen_server:cast(data_buffer, {eol, caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	%% Don't change caret directly.
+	State#state{caret = Caret#caret{line = Line + 1, column = 1}};
+handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{buffer = Buffer, caret = Caret} = State) ->
+	gen_server:cast(data_buffer, {delete_left, caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	State#state{caret = move_caret_left(Caret, Buffer)};	
+handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{buffer = Buffer, caret = Caret} = State) ->
+	gen_server:cast(data_buffer, {delete_right, caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	State;	
+handle_key(#wxKey{type = char, uniChar = Char}, #state{buffer = Buffer, caret = #caret{column = Column} = Caret} = State) ->
+	%% Send message to data buffer to update.
+	gen_server:cast(data_buffer, {char, [Char], caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	%% Don't change caret directly.
+	State#state{caret = Caret#caret{column = Column + 1}}.
 
 create_window() ->
 	%% Create the window.
