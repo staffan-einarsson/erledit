@@ -37,28 +37,31 @@
 %% Internal functions
 %% ===================================================================
 
-move_left(#ee_caret{line = 1, column = 1} = Caret, _Buffer) ->
-	Caret;
-move_left(#ee_caret{line = LineNo, column = 1}, Buffer) ->
-	Coords = ee_buffer:new_buffer_coords(LineNo - 1, ee_buffer:get_line_length(Buffer, LineNo - 1) + 1),
-	buffer_coords_to_caret(Coords, Buffer);
 move_left(#ee_caret{} = Caret, Buffer) ->
-	#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset} = caret_to_buffer_coords(Caret, Buffer),
-	buffer_coords_to_caret(ee_buffer:new_buffer_coords(LineNo, LineOffset - 1), Buffer).
+	move_horizontally(Caret, -1, Buffer).
 
 move_right(#ee_caret{} = Caret, Buffer) ->
-	#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset} = caret_to_buffer_coords(Caret, Buffer),
-	case LineOffset =< ee_buffer:get_line_length(Buffer, LineNo) of
-		true ->
-			buffer_coords_to_caret(ee_buffer:new_buffer_coords(LineNo, LineOffset + 1), Buffer);
-		_ ->
-			move_right_to_next_line(Caret, ee_buffer:get_num_lines(Buffer))
-	end.
+	move_horizontally(Caret, 1, Buffer).
 
-move_right_to_next_line(#ee_caret{line = LineNo} = Caret, NumLines) when LineNo < NumLines ->
-	Caret#ee_caret{line = LineNo + 1, column = 1};
-move_right_to_next_line(Caret, _NumLines) ->
-	Caret.
+move_horizontally(Caret, Amount, Buffer) ->
+	BufferCoords = #ee_buffer_coords{line_no = LineNo} = caret_to_buffer_coords(Caret, Buffer),
+	move_horizontally(Caret, BufferCoords, Amount, Buffer, ee_buffer:get_line_length(Buffer, LineNo), ee_buffer:get_line_length(Buffer, LineNo - 1), ee_buffer:get_num_lines(Buffer)).
+
+%% Move left more than one line AND this is the first line -> clamp at beginning of line
+move_horizontally(Caret, #ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}, Amount, Buffer, _CurrentLineLength, _PreviousLineLength, _LastLineNo) when Amount < 1 - LineOffset, LineNo == 1 ->
+	move_to_beginning_of_line(Caret, Buffer);
+%% Move right more than one line AND this is the last line -> clamp at end of line
+move_horizontally(Caret, #ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}, Amount, Buffer, CurrentLineLength, _PreviousLineLength, LastLineNo) when Amount > CurrentLineLength + 1 - LineOffset, LineNo == LastLineNo ->
+	move_to_end_of_line(Caret, Buffer);
+%% Move left more than one line -> subtract offset and recurse on prev line
+move_horizontally(Caret, #ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}, Amount, Buffer, _CurrentLineLength, PreviousLineLength, LastLineNo) when Amount < 1 - LineOffset ->
+	move_horizontally(Caret, ee_buffer:new_buffer_coords(LineNo - 1, PreviousLineLength + 1), Amount + LineOffset, Buffer, PreviousLineLength, ee_buffer:get_line_length(Buffer, LineNo - 2), LastLineNo);
+%% Move right more than one line -> subtract offset and recurse on next line
+move_horizontally(Caret, #ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}, Amount, Buffer, CurrentLineLength, _PreviousLineLength, LastLineNo) when Amount > CurrentLineLength + 1 - LineOffset ->
+	move_horizontally(Caret, ee_buffer:new_buffer_coords(LineNo + 1, 1), Amount - (CurrentLineLength + 1 - LineOffset) - 1, Buffer, ee_buffer:get_line_length(Buffer, LineNo + 1), CurrentLineLength, LastLineNo);
+%% Move within current line -> Update coords and caret
+move_horizontally(_Caret, #ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}, Amount, Buffer, _CurrentLineLength, _PreviousLineLength, _LastLineNo) ->
+	buffer_coords_to_caret(ee_buffer:new_buffer_coords(LineNo, LineOffset + Amount), Buffer).
 	
 move_up(Caret, Buffer) ->
 	move_up(Caret, 1, Buffer).

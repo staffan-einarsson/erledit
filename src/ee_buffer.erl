@@ -50,8 +50,10 @@ remove_right(#ee_buffer{lines = Lines} = Buffer, #ee_buffer_coords{} = RemoveCoo
 	#ee_buffer_line{contents = LastLineContents} = lists:last(Lines),
 	Buffer#ee_buffer{lines = remove_right_(Lines, RemoveCoords, length(LastLineContents))}.
 
-get_line(#ee_buffer{lines = Lines}, LineNo) ->
-	lists:nth(LineNo, Lines).
+get_line(#ee_buffer{lines = Lines}, LineNo) when LineNo >= 1, LineNo =< length(Lines) ->
+	lists:nth(LineNo, Lines);
+get_line(_Buffer, _LineNo) ->
+	invalid_line.
 
 get_line_number(#ee_buffer_line{line_no = LineNo}) ->
 	LineNo.
@@ -63,7 +65,9 @@ get_line_length(Buffer, LineNo) ->
 	get_line_length(get_line(Buffer, LineNo)).
 
 get_line_length(#ee_buffer_line{contents = Contents}) ->
-	length(Contents).
+	length(Contents);
+get_line_length(invalid_line) ->
+	invalid_line.
 
 get_num_lines(#ee_buffer{lines = Lines}) ->
 	length(Lines).
