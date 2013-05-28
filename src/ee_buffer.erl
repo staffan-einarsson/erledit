@@ -58,6 +58,8 @@ get_line(_Buffer, _LineNo) ->
 get_line_number(#ee_buffer_line{line_no = LineNo}) ->
 	LineNo.
 
+get_line_contents(invalid_line) ->
+	no_contents;
 get_line_contents(#ee_buffer_line{contents = Contents}) ->
 	Contents.
 
