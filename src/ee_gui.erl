@@ -110,7 +110,7 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_wind
 handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{buffer = Buffer, caret = #ee_caret{line = Line} = Caret} = State) ->
 	gen_server:cast(data_buffer, {eol, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	%% Don't change caret directly.
+	%% TODO: Avoid changing caret directly. Waiting for #29.
 	State#state{caret = Caret#ee_caret{line = Line + 1, column = 1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{buffer = Buffer, caret = Caret} = State) ->
 	gen_server:cast(data_buffer, {delete_left, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
@@ -124,8 +124,7 @@ handle_key(#wxKey{type = char, uniChar = Char}, #state{buffer = Buffer, caret = 
 	%% Send message to data buffer to update.
 	gen_server:cast(data_buffer, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	%% Don't change caret directly.
-	State#state{caret = Caret#ee_caret{column = Column + 1}}.
+	State#state{caret = ee_caret:move_to(Caret#ee_caret{column = Column + 4}, Buffer)}.
 
 create_window() ->
 	%% Create the window.

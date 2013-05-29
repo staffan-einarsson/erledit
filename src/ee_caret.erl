@@ -17,6 +17,7 @@
 	move_to_end_of_line/2,
 	move_up_one_page/2,
 	move_down_one_page/2,
+	move_to/2,
 	caret_to_buffer_coords/2,
 	buffer_coords_to_caret/2
 	]).
@@ -91,7 +92,7 @@ move_to(_Caret, #ee_buffer_coords{line_no = LineNo}, Buffer, _LineLength, _NumLi
 	buffer_coords_to_caret(ee_buffer:new_buffer_coords(1, 1), Buffer);
 %% Move to a line after the end -> Clamp to last line
 move_to(_Caret, #ee_buffer_coords{line_no = LineNo}, Buffer, _LineLength, NumLines) when LineNo > NumLines ->
-	buffer_coords_to_caret(ee_buffer:new_buffer_coords(NumLines, ee_buffer:get_line_length(Buffer, NumLines)), Buffer);
+	buffer_coords_to_caret(ee_buffer:new_buffer_coords(NumLines, ee_buffer:get_line_length(Buffer, NumLines) + 1), Buffer);
 %% Move to a line where the given pos is before beginning of line -> Clamp to beginning of line
 move_to(_Caret, #ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}, Buffer, _LineLength, _NumLines) when LineOffset < 1 ->
 	buffer_coords_to_caret(ee_buffer:new_buffer_coords(LineNo, 1), Buffer);
