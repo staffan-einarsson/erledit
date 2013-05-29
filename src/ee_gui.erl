@@ -107,11 +107,11 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEUP}, #state{win = #main_window
 handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
 	wxFrame:refresh(Window),
 	State#state{caret = ee_caret:move_down_one_page(Caret, Buffer)};
-handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{buffer = Buffer, caret = #ee_caret{line = Line} = Caret} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret} = State) ->
 	gen_server:cast(data_buffer, {eol, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
 	%% TODO: Avoid changing caret directly. Waiting for #29.
-	State#state{caret = Caret#ee_caret{line = Line + 1, column = 1}};
+	State#state{caret = Caret#ee_caret{line_no = LineNo + 1, col_no = 1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{buffer = Buffer, caret = Caret} = State) ->
 	gen_server:cast(data_buffer, {delete_left, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
@@ -120,11 +120,16 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{buffer = Buffer, c
 	gen_server:cast(data_buffer, {delete_right, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
 	State;	
-handle_key(#wxKey{type = char, uniChar = Char}, #state{buffer = Buffer, caret = #ee_caret{column = Column} = Caret} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_TAB, uniChar = Char}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret} = State) ->
 	%% Send message to data buffer to update.
 	gen_server:cast(data_buffer, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	State#state{caret = ee_caret:move_to(Caret#ee_caret{column = Column + 4}, Buffer)}.
+	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 4}, Buffer)};
+handle_key(#wxKey{type = char, uniChar = Char}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret} = State) ->
+	%% Send message to data buffer to update.
+	gen_server:cast(data_buffer, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(data_buffer, {get_buffer, self()}),
+	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 1}, Buffer)}.
 
 create_window() ->
 	%% Create the window.
