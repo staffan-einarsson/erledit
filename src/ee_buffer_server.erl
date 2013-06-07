@@ -5,7 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(ee_data_buffer).
+-module(ee_buffer_server).
 -behaviour(gen_server).
 
 %% API

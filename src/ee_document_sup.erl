@@ -31,5 +31,5 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	{ok, {{one_for_one, 5, 10}, [?CHILD(ee_data_buffer, worker, [{filename, "readme"}]), ?CHILD(ee_gui, worker, [])]}}.
+	{ok, {{one_for_one, 5, 10}, [?CHILD(ee_buffer_server, worker, [{filename, "readme"}]), ?CHILD(ee_gui, worker, [])]}}.
 
