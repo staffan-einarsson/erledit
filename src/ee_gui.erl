@@ -125,11 +125,14 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_TAB, uniChar = Char}, #state{buffe
 	gen_server:cast(data_buffer, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
 	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 4}, Buffer)};
-handle_key(#wxKey{type = char, uniChar = Char}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret} = State) ->
+handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret} = State) when KeyCode > 31, KeyCode < 256 ->
 	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(data_buffer, {char, [KeyCode], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
 	gen_server:cast(data_buffer, {get_buffer, self()}),
-	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 1}, Buffer)}.
+	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 1}, Buffer)};
+handle_key(#wxKey{type = char, keyCode = KeyCode}, State) ->
+	io:format("Ignored key: ~p~n", [KeyCode]),
+	State.
 
 create_window() ->
 	%% Create the window.
