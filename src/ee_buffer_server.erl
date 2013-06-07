@@ -44,10 +44,7 @@ start_link(Args) ->
 
 init(Args) ->
 	{filename, FileName} = proplists:lookup(filename, Args),
-	{ok, File} = file:open(FileName, [read]),
-	{ok, String = [_|_]} = file:read(File, 100000),
-	ok = file:close(File),
-	{ok, #state{buffer = ee_buffer:create_from_string(String)}}.
+	{ok, #state{buffer = load_buffer_from_file(FileName)}}.
 
 terminate(_Reason, _State) ->
 	ok.
@@ -81,3 +78,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+load_buffer_from_file(FilePath) ->
+	{ok, File} = file:open(FilePath, [read]),
+	{ok, String = [_|_]} = file:read(File, 100000),
+	ok = file:close(File),
+	ee_buffer:create_from_string(String).
