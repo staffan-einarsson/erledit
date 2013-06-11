@@ -1,12 +1,12 @@
-{application, erledit,
- [
-  {description, ""},
-  {vsn, "1"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
-  {mod, { erledit_app, []}},
-  {env, []}
- ]}.
+{application, erledit, [
+	{description, "Interactive source editor for erlang."},
+	{vsn, "0.1.0"},
+	{registered, []},
+	{applications, [
+		kernel,
+		stdlib,
+		sasl
+		]},
+	{mod, { erledit_app, []}},
+	{env, []}
+	]}.

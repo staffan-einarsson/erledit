@@ -1,2 +1,2 @@
 @echo off
-erl -pa ebin -run erledit
+erl -pa ebin -boot start_sasl -run erledit
