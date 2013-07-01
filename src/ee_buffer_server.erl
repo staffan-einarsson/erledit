@@ -44,9 +44,10 @@ start_link(Args) ->
 
 init(Args) ->
 	{filename, FileName} = proplists:lookup(filename, Args),
-	{ok, #state{buffer = load_buffer_from_file(FileName)}}.
+	{ok, #state{buffer = load_buffer_from_file(FileName)}, 0}.
 
 terminate(_Reason, _State) ->
+	ee_document_controller:delete(self()),
 	ok.
 
 handle_call(_Request, _From, State) ->
@@ -69,6 +70,9 @@ handle_cast({char, Char, #ee_buffer_coords{} = Coords}, #state{buffer = Buffer} 
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
+handle_info(timeout, State) ->
+	ee_document_controller:insert(self()),
+	{noreply, State};
 handle_info(_Info, State) ->
 	{noreply, State}.
 
