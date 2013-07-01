@@ -18,7 +18,8 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-	ee_sup:start_link().
+	ee_sup:start_link(),
+	ee_document_sup:start_child().
 
 stop(_State) ->
 	ok.
