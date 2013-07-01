@@ -5,7 +5,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
--module(ee_root_sup).
+-module(ee_sup).
 -behaviour(supervisor).
 
 %% API

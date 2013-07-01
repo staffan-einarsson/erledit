@@ -18,7 +18,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-	ee_root_sup:start_link().
+	ee_sup:start_link().
 
 stop(_State) ->
 	ok.
