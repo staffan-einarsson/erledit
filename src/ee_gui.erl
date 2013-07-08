@@ -26,14 +26,14 @@
 -include("ee_caret.hrl").
 
 -record(main_window, {window, status_bar}).
--record(state, {win = #main_window{}, buffer, caret = #ee_caret{}}).
+-record(state, {win = #main_window{}, buffer, caret = #ee_caret{}, documents = []}).
 
 %% ===================================================================
 %% API
 %% ===================================================================
 
 start_link() ->
-	gen_server:start_link({local, gui}, ?MODULE, [], [
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [], [
 		%{debug, [trace]}
 		]).
 
@@ -42,12 +42,14 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
+	%%{ok, [Document]} = ee_document_controller:get_documents(),
+	%%gen_server:cast(Document, {get_buffer, self()}),
+	ee_document_controller:add_subscriber(self()),
 	wx:new(),
 	MainWindow = create_window(),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
 	State = #state{win = MainWindow},
 	io:format("~p Original state is ~p~n", [self(), State]),
-	{ok, State}.
+	{ok, State, 0}.
 
 terminate(Reason, State) ->
 	io:format("~p Terminate: Reason: ~p~nState: ~p~n", [self(), Reason, State]),
@@ -63,6 +65,9 @@ handle_call(Msg, _From, State) ->
 handle_cast({buffer, Buffer}, #state{win = #main_window{window = Window}} = State) ->
 	wxFrame:refresh(Window),
 	{noreply, State#state{buffer = Buffer}};
+handle_cast({document_inserted, DocPid}, #state{documents = Documents} = State) ->
+	gen_server:cast(DocPid, {get_buffer, self()}),
+	{noreply, State#state{documents = [DocPid|Documents]}};
 handle_cast(Msg, State) ->
 	io:format("~p Got Cast ~p~n", [self(), Msg]),
 	{noreply, State}.
@@ -107,28 +112,28 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEUP}, #state{win = #main_window
 handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
 	wxFrame:refresh(Window),
 	State#state{caret = ee_caret:move_down_one_page(Caret, Buffer)};
-handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret} = State) ->
-	gen_server:cast(data_buffer, {eol, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
+handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret, documents = [Document]} = State) ->
+	gen_server:cast(Document, {eol, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(Document, {get_buffer, self()}),
 	%% TODO: Avoid changing caret directly. Waiting for #29.
 	State#state{caret = Caret#ee_caret{line_no = LineNo + 1, col_no = 1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{buffer = Buffer, caret = Caret} = State) ->
-	gen_server:cast(data_buffer, {delete_left, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
+handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{buffer = Buffer, caret = Caret, documents = [Document]} = State) ->
+	gen_server:cast(Document, {delete_left, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(Document, {get_buffer, self()}),
 	State#state{caret = ee_caret:move_left(Caret, Buffer)};	
-handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{buffer = Buffer, caret = Caret} = State) ->
-	gen_server:cast(data_buffer, {delete_right, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
+handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{buffer = Buffer, caret = Caret, documents = [Document]} = State) ->
+	gen_server:cast(Document, {delete_right, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(Document, {get_buffer, self()}),
 	State;	
-handle_key(#wxKey{type = char, keyCode = ?WXK_TAB, uniChar = Char}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_TAB, uniChar = Char}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret, documents = [Document]} = State) ->
 	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
+	gen_server:cast(Document, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(Document, {get_buffer, self()}),
 	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 4}, Buffer)};
-handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret} = State) when KeyCode > 31, KeyCode < 256 ->
+handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret, documents = [Document]} = State) when KeyCode > 31, KeyCode < 256 ->
 	%% Send message to data buffer to update.
-	gen_server:cast(data_buffer, {char, [KeyCode], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(data_buffer, {get_buffer, self()}),
+	gen_server:cast(Document, {char, [KeyCode], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
+	gen_server:cast(Document, {get_buffer, self()}),
 	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 1}, Buffer)};
 handle_key(#wxKey{type = char, keyCode = KeyCode}, State) ->
 	io:format("Ignored key: ~p~n", [KeyCode]),
@@ -152,10 +157,12 @@ create_window() ->
 	#main_window{window = Window, status_bar = StatusBar}.
 
 handle_paint(#wx{obj = Window}, _WxObject) ->
-	{Buffer, Caret} = gen_server:call(gui, {get_buffer}),
+	{Buffer, Caret} = gen_server:call(?MODULE, {get_buffer}),
 	draw_buffer(Window, Buffer, Caret),
 	ok.
 
+draw_buffer(_, undefined, _) ->
+	ok;
 draw_buffer(Window, Buffer, Caret) ->
 	DC = wxPaintDC:new(Window),
 	ok = wxDC:setBackground(DC, ?wxWHITE_BRUSH),

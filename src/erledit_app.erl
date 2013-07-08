@@ -18,7 +18,6 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-	ee_document_controller:init(),
 	ee_sup:start_link(),
 	ee_document_sup:start_child().
 

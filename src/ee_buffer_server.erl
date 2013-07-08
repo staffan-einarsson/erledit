@@ -34,7 +34,7 @@
 %%--------------------------------------------------------------------
 
 start_link(Args) ->
-	gen_server:start_link({local, data_buffer}, ?MODULE, [Args], [
+	gen_server:start_link(?MODULE, [Args], [
 		%{debug, [trace]}
 		]).
 
