@@ -50,8 +50,8 @@ terminate(_Reason, _State) ->
 	ee_document_controller:delete(self()),
 	ok.
 
-handle_call(_Request, _From, State) ->
-	{reply, ok, State}.
+handle_call(Msg, _From, _State) ->
+	erlang:error({bad_call, Msg}).
 
 handle_cast(display, #state{buffer = Buffer} = State) ->
 	io:format("Displaying contents of file:~n~p~n", [Buffer]),
@@ -67,14 +67,14 @@ handle_cast({eol, #ee_buffer_coords{} = Coords}, #state{buffer = Buffer} = State
 	{noreply, State#state{buffer = ee_buffer:insert_eol(Buffer, Coords)}};
 handle_cast({char, Char, #ee_buffer_coords{} = Coords}, #state{buffer = Buffer} = State) ->
 	{noreply, State#state{buffer = ee_buffer:insert_text(Buffer, Char, Coords)}};
-handle_cast(_Msg, State) ->
-	{noreply, State}.
+handle_cast(Msg, _State) ->
+	erlang:error({bad_cast, Msg}).
 
 handle_info(timeout, State) ->
 	ee_document_controller:insert(self()),
 	{noreply, State};
-handle_info(_Info, State) ->
-	{noreply, State}.
+handle_info(Msg, _State) ->
+	erlang:error({bad_info, Msg}).
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.

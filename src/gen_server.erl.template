@@ -44,14 +44,14 @@ init([]) ->
 terminate(_Reason, _State) ->
 	ok.
 
-handle_call(_Request, _From, State) ->
-	{reply, ok, State}.
+handle_call(Msg, _From, State) ->
+	erlang:error({bad_call, Msg}).
 
 handle_cast(_Msg, State) ->
-	{noreply, State}.
+	erlang:error({bad_cast, Msg}).
 
 handle_info(_Info, State) ->
-	{noreply, State}.
+	erlang:error({bad_info, Msg}).
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.

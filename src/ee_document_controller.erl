@@ -23,7 +23,7 @@
 
 -include("ee_global.hrl").
 
--record(state, {documents = [], subscribers = []}).
+-record(state, {documents = [], pubsub_state}).
 
 %%%===================================================================
 %%% API
@@ -49,28 +49,32 @@ add_subscriber(Pid) ->
 %%%===================================================================
 
 init([]) ->
-	{ok, #state{}}.
+	{ok, #state{documents = [], pubsub_state = ee_pubsub:new()}}.
 
 terminate(_Reason, _State) ->
 	ok.
 
-handle_call({insert, Pid}, _From, #state{documents = Documents, subscribers = Subscribers} = State) ->
-	lists:foreach(fun(Subscriber) -> gen_server:cast(Subscriber, {document_inserted, Pid}) end, Subscribers),
-	{reply, {ok, Pid}, State#state{documents = lists:append([Pid], Documents)}};
-handle_call({delete, Pid}, _From, #state{documents = Documents} = State) ->
-	{reply, {ok, Pid}, State#state{documents = lists:delete(Pid, Documents)}};
+handle_call({insert, Pid}, _From, #state{documents = Documents0, pubsub_state = PubSubState0} = State) ->
+	Documents1 = lists:append([Pid], Documents0),
+	PubSubState1 = ee_pubsub:publish(PubSubState0, {document_inserted, Pid}),
+	{reply, {ok, Pid}, State#state{documents = Documents1, pubsub_state = PubSubState1}};
+handle_call({delete, Pid}, _From, #state{documents = Documents0, pubsub_state = PubSubState0} = State) ->
+	Documents1 = lists:delete(Pid, Documents0),
+	PubSubState1 = ee_pubsub:publish(PubSubState0, {document_deleted, Pid}),
+	{reply, {ok, Pid}, State#state{documents = Documents1, pubsub_state = PubSubState1}};
 handle_call({get_documents}, _From, #state{documents = Documents} = State) ->
 	{reply, {ok, Documents}, State};
-handle_call(_Request, _From, State) ->
-	{stop, bad_call, State}.
+handle_call(Msg, _From, _State) ->
+	erlang:error({bad_call, Msg}).
 
-handle_cast({add_subscriber, Pid}, #state{subscribers = Subscribers} = State) ->
-	{noreply, State#state{subscribers = [Pid|Subscribers]}};
-handle_cast(_Msg, State) ->
-	{stop, bad_cast, State}.
+handle_cast({add_subscriber, Pid}, #state{pubsub_state = PubSubState0} = State) ->
+	PubSubState1 = ee_pubsub:add_subscriber(PubSubState0, Pid),
+	{noreply, State#state{pubsub_state = PubSubState1}};
+handle_cast(Msg, _State) ->
+	erlang:error({bad_cast, Msg}).
 
-handle_info(_Info, State) ->
-	{stop, bad_info, State}.
+handle_info(Msg, _State) ->
+	erlang:error({bad_info, Msg}).
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
