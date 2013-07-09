@@ -1,2 +1,2 @@
 @echo off
-werl -pa ebin -boot start_sasl -run erledit
+werl -pa ebin -boot start_sasl -run appmon -run erledit

@@ -42,44 +42,39 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	%%{ok, [Document]} = ee_document_controller:get_documents(),
-	%%gen_server:cast(Document, {get_buffer, self()}),
 	ee_document_controller:add_subscriber(self()),
-	wx:new(),
-	MainWindow = create_window(),
-	State = #state{win = MainWindow},
-	io:format("~p Original state is ~p~n", [self(), State]),
-	{ok, State, 0}.
+	{ok, #state{}, 0}.
 
-terminate(Reason, State) ->
-	io:format("~p Terminate: Reason: ~p~nState: ~p~n", [self(), Reason, State]),
+terminate(_Reason, _State) ->
 	wx:destroy(),
 	ok.
 
 handle_call({get_buffer}, _From, #state{buffer = Buffer, caret = Caret} = State) ->
 	{reply, {Buffer, Caret}, State};
-handle_call(Msg, _From, State) ->
-	io:format("~p Got Call ~p~n", [self(), Msg]),
-	{reply, ok, State}.
+handle_call(Msg, _From, _State) ->
+	erlang:error({bad_call, Msg}).
 
 handle_cast({buffer, Buffer}, #state{win = #main_window{window = Window}} = State) ->
 	wxFrame:refresh(Window),
 	{noreply, State#state{buffer = Buffer}};
-handle_cast({document_inserted, DocPid}, #state{documents = Documents} = State) ->
-	gen_server:cast(DocPid, {get_buffer, self()}),
-	{noreply, State#state{documents = [DocPid|Documents]}};
-handle_cast(Msg, State) ->
-	io:format("~p Got Cast ~p~n", [self(), Msg]),
-	{noreply, State}.
+handle_cast(Msg, _State) ->
+	erlang:error({bad_cast, Msg}).
 
 handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
 	wxWindow:destroy(Window),
 	{stop, normal, State};
 handle_info(#wx{event = #wxKey{} = KeyEvent}, State) ->
 	{noreply, handle_key(KeyEvent, State)};
-handle_info(Msg, State) ->
-	io:format("~p Got Info ~p~n", [self(), Msg]),
-	{noreply, State}.
+handle_info({ee_pubsub, {document_inserted, DocPid}, _From}, #state{documents = Documents} = State) ->
+	gen_server:cast(DocPid, {get_buffer, self()}),
+	{noreply, State#state{documents = [DocPid|Documents]}};
+handle_info({ee_pubsub, {document_deleted, DocPid}, _From}, #state{documents = Documents} = State) ->
+	{noreply, State#state{documents = lists:delete(DocPid, Documents)}};
+handle_info(timeout, State) ->
+	wx:new(),
+	{noreply, State#state{win = create_window()}};
+handle_info(Msg, _State) ->
+	erlang:error({bad_info, Msg}).
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
