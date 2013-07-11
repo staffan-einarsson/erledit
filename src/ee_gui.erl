@@ -54,9 +54,6 @@ handle_call({get_buffer}, _From, #state{buffer = Buffer, caret = Caret} = State)
 handle_call(Msg, _From, _State) ->
 	erlang:error({bad_call, Msg}).
 
-handle_cast({buffer, Buffer}, #state{win = #main_window{window = Window}} = State) ->
-	wxFrame:refresh(Window),
-	{noreply, State#state{buffer = Buffer}};
 handle_cast(Msg, _State) ->
 	erlang:error({bad_cast, Msg}).
 
@@ -65,11 +62,16 @@ handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}}
 	{stop, normal, State};
 handle_info(#wx{event = #wxKey{} = KeyEvent}, State) ->
 	{noreply, handle_key(KeyEvent, State)};
+%% TODO: replace raw ee_pubsub message with a record.
 handle_info({ee_pubsub, {document_inserted, DocPid}, _From}, #state{documents = Documents} = State) ->
-	gen_server:cast(DocPid, {get_buffer, self()}),
-	{noreply, State#state{documents = [DocPid|Documents]}};
+	ee_buffer_server:add_subscriber(DocPid, self()),
+	{ok, Buffer} = ee_buffer_server:get_buffer(DocPid),
+	{noreply, State#state{buffer = Buffer, documents = [DocPid|Documents]}};
 handle_info({ee_pubsub, {document_deleted, DocPid}, _From}, #state{documents = Documents} = State) ->
 	{noreply, State#state{documents = lists:delete(DocPid, Documents)}};
+handle_info({ee_pubsub, {buffer_update, Buffer}, _From}, #state{win = #main_window{window = Window}} = State) ->
+	wxFrame:refresh(Window),
+	{noreply, State#state{buffer = Buffer}};
 handle_info(timeout, State) ->
 	wx:new(),
 	{noreply, State#state{win = create_window()}};
@@ -108,27 +110,20 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_wind
 	wxFrame:refresh(Window),
 	State#state{caret = ee_caret:move_down_one_page(Caret, Buffer)};
 handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret, documents = [Document]} = State) ->
-	gen_server:cast(Document, {eol, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(Document, {get_buffer, self()}),
+	ee_buffer_server:insert_eol(Document, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	%% TODO: Avoid changing caret directly. Waiting for #29.
 	State#state{caret = Caret#ee_caret{line_no = LineNo + 1, col_no = 1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{buffer = Buffer, caret = Caret, documents = [Document]} = State) ->
-	gen_server:cast(Document, {delete_left, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(Document, {get_buffer, self()}),
+	ee_buffer_server:remove_left(Document, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	State#state{caret = ee_caret:move_left(Caret, Buffer)};	
 handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{buffer = Buffer, caret = Caret, documents = [Document]} = State) ->
-	gen_server:cast(Document, {delete_right, ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(Document, {get_buffer, self()}),
+	ee_buffer_server:remove_right(Document, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	State;	
-handle_key(#wxKey{type = char, keyCode = ?WXK_TAB, uniChar = Char}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret, documents = [Document]} = State) ->
-	%% Send message to data buffer to update.
-	gen_server:cast(Document, {char, [Char], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(Document, {get_buffer, self()}),
+handle_key(#wxKey{type = char, keyCode = ?WXK_TAB}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret, documents = [Document]} = State) ->
+	ee_buffer_server:insert_text(Document, [?WXK_TAB], ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 4}, Buffer)};
 handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret, documents = [Document]} = State) when KeyCode > 31, KeyCode < 256 ->
-	%% Send message to data buffer to update.
-	gen_server:cast(Document, {char, [KeyCode], ee_caret:caret_to_buffer_coords(Caret, Buffer)}),
-	gen_server:cast(Document, {get_buffer, self()}),
+	ee_buffer_server:insert_text(Document, [KeyCode], ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	State#state{caret = ee_caret:move_to(Caret#ee_caret{col_no = ColNo + 1}, Buffer)};
 handle_key(#wxKey{type = char, keyCode = KeyCode}, State) ->
 	io:format("Ignored key: ~p~n", [KeyCode]),
