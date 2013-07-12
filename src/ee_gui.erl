@@ -85,6 +85,9 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ===================================================================
 
+handle_key(#wxKey{type = char, keyCode = ?WXK_F1}, State) ->
+	ee_document_sup:open_document("readme"),
+	State;
 handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, buffer = Buffer, caret = Caret} = State) ->
 	wxFrame:refresh(Window),
 	State#state{caret = ee_caret:move_left(Caret, Buffer)};
