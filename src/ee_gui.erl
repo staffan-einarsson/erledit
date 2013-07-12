@@ -63,9 +63,10 @@ handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}}
 handle_info(#wx{event = #wxKey{} = KeyEvent}, State) ->
 	{noreply, handle_key(KeyEvent, State)};
 %% TODO: replace raw ee_pubsub message with a record.
-handle_info({ee_pubsub, {document_inserted, DocPid}, _From}, #state{documents = Documents} = State) ->
+handle_info({ee_pubsub, {document_inserted, DocPid}, _From}, #state{win = #main_window{window = Window}, documents = Documents} = State) ->
 	ee_buffer_server:add_subscriber(DocPid, self()),
 	{ok, Buffer} = ee_buffer_server:get_buffer(DocPid),
+	wxFrame:refresh(Window),
 	{noreply, State#state{buffer = Buffer, documents = [DocPid|Documents]}};
 handle_info({ee_pubsub, {document_deleted, DocPid}, _From}, #state{documents = Documents} = State) ->
 	{noreply, State#state{documents = lists:delete(DocPid, Documents)}};
@@ -154,7 +155,9 @@ handle_paint(#wx{obj = Window}, _WxObject) ->
 	draw_buffer(Window, Buffer, Caret),
 	ok.
 
-draw_buffer(_, undefined, _) ->
+draw_buffer(Window, undefined, _) ->
+	DC = wxPaintDC:new(Window),
+	wxPaintDC:destroy(DC),
 	ok;
 draw_buffer(Window, Buffer, Caret) ->
 	DC = wxPaintDC:new(Window),
