@@ -15,23 +15,23 @@
 	publish/2
 	]).
 
--record(ee_pubsub, {subscribers = []}).
+-include("ee_pubsub.hrl").
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 new() ->
-	#ee_pubsub{}.
+	#ee_pubsub_state{}.
 	
-add_subscriber(#ee_pubsub{subscribers = Subscribers}, Pid) ->
-	#ee_pubsub{subscribers = [Pid|Subscribers]}.
+add_subscriber(#ee_pubsub_state{subscribers = Subscribers}, Pid) ->
+	#ee_pubsub_state{subscribers = [Pid|Subscribers]}.
 
-remove_subscriber(#ee_pubsub{subscribers = Subscribers}, Pid) ->
-	#ee_pubsub{subscribers = lists:delete(Pid, Subscribers)}.
+remove_subscriber(#ee_pubsub_state{subscribers = Subscribers}, Pid) ->
+	#ee_pubsub_state{subscribers = lists:delete(Pid, Subscribers)}.
 
-publish(#ee_pubsub{subscribers = Subscribers}, Message) ->
-	#ee_pubsub{subscribers = publish(Message, Subscribers, [])}.
+publish(#ee_pubsub_state{subscribers = Subscribers}, Message) ->
+	#ee_pubsub_state{subscribers = publish(Message, Subscribers, [])}.
 
 %%%===================================================================
 %%% Internal functions
@@ -40,7 +40,8 @@ publish(#ee_pubsub{subscribers = Subscribers}, Message) ->
 publish(_, [], ResList) ->
 	lists:reverse(ResList);
 publish(Message, [Subscriber|T], ResList) ->
-	case catch Subscriber ! {?MODULE, Message, self()} of
+	PubSubMessage = #ee_pubsub_message{message = Message, publisher = self()},
+	case catch Subscriber ! PubSubMessage of
 		{'EXIT', {noproc, _}} ->
 			publish(Message, T, ResList);
 		_ ->

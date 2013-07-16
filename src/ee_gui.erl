@@ -24,6 +24,7 @@
 -include("ee_document.hrl").
 -include("ee_buffer.hrl").
 -include("ee_doc_set.hrl").
+-include("ee_pubsub.hrl").
 
 -record(main_window, {window, status_bar}).
 -record(state, {win = #main_window{}, doc_set = #ee_doc_set{}}).
@@ -65,8 +66,7 @@ handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}}
 	{stop, normal, State};
 handle_info(#wx{event = #wxKey{} = KeyEvent}, State) ->
 	{noreply, handle_key(KeyEvent, State)};
-%% TODO: replace raw ee_pubsub message with a record.
-handle_info({ee_pubsub, {document_inserted, DocPid}, _From}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_info(#ee_pubsub_message{message = {document_inserted, DocPid}}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
 	ee_buffer_server:add_subscriber(DocPid, self()),
 	{ok, Buffer} = ee_buffer_server:get_buffer(DocPid),
@@ -74,10 +74,10 @@ handle_info({ee_pubsub, {document_inserted, DocPid}, _From}, #state{win = #main_
 	{ok, DocSet2} = ee_doc_set:update_document_view_buffer(DocSet1, DocPid, Buffer),
 	wxFrame:refresh(Window),
 	{noreply, State#state{doc_set = DocSet2}};
-handle_info({ee_pubsub, {document_deleted, DocPid}, _From}, #state{doc_set = DocSet0} = State) ->
+handle_info(#ee_pubsub_message{message = {document_deleted, DocPid}}, #state{doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:remove_document_view(DocSet0, DocPid),
 	{noreply, State#state{doc_set = DocSet1}};
-handle_info({ee_pubsub, {buffer_update, Buffer}, DocPid}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_info(#ee_pubsub_message{message = {buffer_update, Buffer}, publisher = DocPid}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:update_document_view_buffer(DocSet0, DocPid, Buffer),
 	wxFrame:refresh(Window),
 	{noreply, State#state{doc_set = DocSet1}};
