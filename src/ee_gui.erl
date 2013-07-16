@@ -27,7 +27,10 @@
 -include("ee_pubsub.hrl").
 
 -record(main_window, {window, status_bar}).
--record(state, {win = #main_window{}, doc_set = #ee_doc_set{}}).
+-record(blink_caret, {state = on, timer}).
+-record(state, {win = #main_window{}, doc_set = #ee_doc_set{}, blink_caret = #blink_caret{}}).
+
+-define(BLINK_INTERVAL, 300).
 
 %% ===================================================================
 %% API
@@ -51,10 +54,11 @@ terminate(_Reason, _State) ->
 	ok.
 
 handle_call({get_buffer}, _From, #state{doc_set = #ee_doc_set{focus_doc = undefined}} = State) ->
-	{reply, {undefined, #ee_caret{}}, State};
-handle_call({get_buffer}, _From, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{buffer = Buffer, caret = Caret}}} = State) ->
+	{reply, {undefined, #ee_caret{}, off}, State};
+handle_call({get_buffer}, _From, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{buffer = Buffer, caret = Caret}}, blink_caret = BlinkCaret} = State) ->
+	#blink_caret{state = BlinkCaretState} = BlinkCaret,
 	%% TODO: Encapsulate doc view in doc set API.
-	{reply, {Buffer, Caret}, State};
+	{reply, {Buffer, Caret, BlinkCaretState}, State};
 handle_call(Msg, _From, _State) ->
 	erlang:error({bad_call, Msg}).
 
@@ -64,8 +68,9 @@ handle_cast(Msg, _State) ->
 handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
 	wxWindow:destroy(Window),
 	{stop, normal, State};
-handle_info(#wx{event = #wxKey{} = KeyEvent}, State) ->
-	{noreply, handle_key(KeyEvent, State)};
+handle_info(#wx{event = #wxKey{} = KeyEvent}, #state{blink_caret = BlinkCaret0} = State) ->
+	BlinkCaret1 = blink_caret_reset(BlinkCaret0),
+	{noreply, handle_key(KeyEvent, State#state{blink_caret = BlinkCaret1})};
 handle_info(#ee_pubsub_message{message = {document_inserted, DocPid}}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
 	ee_buffer_server:add_subscriber(DocPid, self()),
@@ -81,10 +86,16 @@ handle_info(#ee_pubsub_message{message = {buffer_update, Buffer}, publisher = Do
 	{ok, DocSet1} = ee_doc_set:update_document_view_buffer(DocSet0, DocPid, Buffer),
 	wxFrame:refresh(Window),
 	{noreply, State#state{doc_set = DocSet1}};
+handle_info(blink_caret, #state{win = #main_window{window = Window}, blink_caret = BlinkCaret0} = State) ->
+	BlinkCaret1 = blink_caret(BlinkCaret0),
+	wxFrame:refresh(Window),
+	{noreply, State#state{blink_caret = BlinkCaret1}};
 handle_info(timeout, State) ->
 	wx:new(),
 	ee_document_sup:open_document("readme"),
-	{noreply, State#state{win = create_window()}};
+	BlinkCaret = blink_caret_start(),
+	Window = create_window(),
+	{noreply, State#state{win = Window, blink_caret = BlinkCaret}};
 handle_info(Msg, _State) ->
 	erlang:error({bad_info, Msg}).
 
@@ -195,15 +206,15 @@ create_window() ->
 	#main_window{window = Window, status_bar = StatusBar}.
 
 handle_paint(#wx{obj = Window}, _WxObject) ->
-	{Buffer, Caret} = gen_server:call(?MODULE, {get_buffer}),
-	draw_buffer(Window, Buffer, Caret),
+	{Buffer, Caret, BlinkCaretState} = gen_server:call(?MODULE, {get_buffer}),
+	draw_buffer(Window, Buffer, Caret, BlinkCaretState),
 	ok.
 
-draw_buffer(Window, undefined, _) ->
+draw_buffer(Window, undefined, _, _) ->
 	DC = wxPaintDC:new(Window),
 	wxPaintDC:destroy(DC),
 	ok;
-draw_buffer(Window, Buffer, Caret) ->
+draw_buffer(Window, Buffer, Caret, BlinkCaretState) ->
 	DC = wxPaintDC:new(Window),
 	ok = wxDC:setBackground(DC, ?wxWHITE_BRUSH),
 	Font = wxFont:new(10, ?wxFONTFAMILY_TELETYPE, ?wxFONTSTYLE_NORMAL, ?wxFONTWEIGHT_NORMAL),
@@ -211,7 +222,12 @@ draw_buffer(Window, Buffer, Caret) ->
 	{SpaceWidth, LineHeight} = wxDC:getTextExtent(DC, " "),
 	ok = wxDC:clear(DC),
 	ok = draw_buffer_lines(DC, Buffer, LineHeight, SpaceWidth),
-	ok = draw_caret(DC, Buffer, Caret, LineHeight, SpaceWidth),
+	case BlinkCaretState of
+		on ->
+			ok = draw_caret(DC, Buffer, Caret, LineHeight, SpaceWidth);
+		off ->
+			ok
+	end,
 	wxFont:destroy(Font),
 	wxPaintDC:destroy(DC),
 	ok.
@@ -247,3 +263,24 @@ draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y, H, SpaceWidth
 	draw_caret_on_line(DC, T, [], (((XStart + W) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth), Y, H, SpaceWidth);
 draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y, H, SpaceWidth) ->
 	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y, H, SpaceWidth).
+
+blink_caret_start() ->
+	blink_caret_start(on).
+	
+blink_caret_start(State) ->
+	{ok, Timer} = timer:send_after(?BLINK_INTERVAL, blink_caret),
+	#blink_caret{state = State, timer = Timer}.
+
+blink_caret_stop(#blink_caret{timer = Timer}) ->
+	timer:cancel(Timer).
+
+blink_caret_reset(BlinkCaret) ->
+	blink_caret_stop(BlinkCaret),
+	blink_caret_start().
+
+blink_caret(#blink_caret{state = on} = BlinkCaret) ->
+	blink_caret_stop(BlinkCaret),
+	blink_caret_start(off);
+blink_caret(#blink_caret{state = off} = BlinkCaret) ->
+	blink_caret_stop(BlinkCaret),
+	blink_caret_start(on).
