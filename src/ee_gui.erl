@@ -23,12 +23,10 @@
 -include_lib("wx/include/wx.hrl").
 -include("ee_document.hrl").
 -include("ee_buffer.hrl").
--include("ee_caret.hrl").
+-include("ee_doc_set.hrl").
 
 -record(main_window, {window, status_bar}).
--record(doc_view, {pid, buffer, caret = #ee_caret{}}).
--record(doc_set, {focus_doc, background_docs = []}).
--record(state, {win = #main_window{}, doc_set = #doc_set{}}).
+-record(state, {win = #main_window{}, doc_set = #ee_doc_set{}}).
 
 %% ===================================================================
 %% API
@@ -51,9 +49,10 @@ terminate(_Reason, _State) ->
 	wx:destroy(),
 	ok.
 
-handle_call({get_buffer}, _From, #state{doc_set = #doc_set{focus_doc = undefined}} = State) ->
+handle_call({get_buffer}, _From, #state{doc_set = #ee_doc_set{focus_doc = undefined}} = State) ->
 	{reply, {undefined, #ee_caret{}}, State};
-handle_call({get_buffer}, _From, #state{doc_set = #doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret}}} = State) ->
+handle_call({get_buffer}, _From, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{buffer = Buffer, caret = Caret}}} = State) ->
+	%% TODO: Encapsulate doc view in doc set API.
 	{reply, {Buffer, Caret}, State};
 handle_call(Msg, _From, _State) ->
 	erlang:error({bad_call, Msg}).
@@ -68,18 +67,18 @@ handle_info(#wx{event = #wxKey{} = KeyEvent}, State) ->
 	{noreply, handle_key(KeyEvent, State)};
 %% TODO: replace raw ee_pubsub message with a record.
 handle_info({ee_pubsub, {document_inserted, DocPid}, _From}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = add_focus_document_view(DocPid, DocSet0),
+	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
 	ee_buffer_server:add_subscriber(DocPid, self()),
 	{ok, Buffer} = ee_buffer_server:get_buffer(DocPid),
 	%% TODO: Look intoif this is efficient (looking up the doc view by pid again)
-	{ok, DocSet2} = update_document_view_buffer(DocPid, DocSet1, Buffer),
+	{ok, DocSet2} = ee_doc_set:update_document_view_buffer(DocSet1, DocPid, Buffer),
 	wxFrame:refresh(Window),
 	{noreply, State#state{doc_set = DocSet2}};
 handle_info({ee_pubsub, {document_deleted, DocPid}, _From}, #state{doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = remove_document_view(DocPid, DocSet0),
+	{ok, DocSet1} = ee_doc_set:remove_document_view(DocSet0, DocPid),
 	{noreply, State#state{doc_set = DocSet1}};
 handle_info({ee_pubsub, {buffer_update, Buffer}, DocPid}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = update_document_view_buffer(DocPid, DocSet0, Buffer),
+	{ok, DocSet1} = ee_doc_set:update_document_view_buffer(DocSet0, DocPid, Buffer),
 	wxFrame:refresh(Window),
 	{noreply, State#state{doc_set = DocSet1}};
 handle_info(timeout, State) ->
@@ -99,71 +98,71 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_F1}, State) ->
 	ee_document_sup:open_document("readme"),
 	State;
 handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_left_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_RIGHT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_right_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_right_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_UP}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_up_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_up_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_DOWN}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_down_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_down_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_HOME}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_to_line_start_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_to_line_start_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_END}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_to_line_end_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_to_line_end_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEUP}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_up_one_page_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_up_one_page_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = move_caret_down_one_page_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_down_one_page_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
-	#doc_set{focus_doc = #doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret0} = FocusDoc} = DocSet0,
+	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret0} = FocusDoc} = DocSet0,
 	ee_buffer_server:insert_eol(DocPid, ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
 	%% TODO: Avoid changing caret directly. Waiting for #29.
 	Caret1 = Caret0#ee_caret{line_no = LineNo + 1, col_no = 1},
-	DocSet1 = DocSet0#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}},
+	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
-	#doc_set{focus_doc = #doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet0,
+	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet0,
 	ee_buffer_server:remove_left(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
-	{ok, DocSet1} = move_caret_left_in_focus_doc(DocSet0),
+	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{doc_set = DocSet} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
-	#doc_set{focus_doc = #doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet,
+	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet,
 	ee_buffer_server:remove_right(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	State;	
 handle_key(#wxKey{type = char, keyCode = ?WXK_TAB}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
-	#doc_set{focus_doc = #doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
+	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
 	ee_buffer_server:insert_text(DocPid, [?WXK_TAB], ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
 	%% TODO: Simplify this caret movement.
 	Caret1 = ee_caret:move_to(Caret0#ee_caret{col_no = ColNo + 4}, Buffer),
-	DocSet1 = DocSet0#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}},
+	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{doc_set = DocSet0} = State) when KeyCode > 31, KeyCode < 256 ->
 	%% TODO: Refactor so that doc_set internals are hidden.
-	#doc_set{focus_doc = #doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
+	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
 	ee_buffer_server:insert_text(DocPid, [KeyCode], ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
 	%% TODO: Simplify this caret movement.
 	Caret1 = ee_caret:move_to(Caret0#ee_caret{col_no = ColNo + 1}, Buffer),
-	DocSet1 = DocSet0#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}},
+	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
 	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = KeyCode}, State) ->
 	io:format("Ignored key: ~p~n", [KeyCode]),
@@ -239,64 +238,3 @@ draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y, H, SpaceWidth
 	draw_caret_on_line(DC, T, [], (((XStart + W) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth), Y, H, SpaceWidth);
 draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y, H, SpaceWidth) ->
 	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y, H, SpaceWidth).
-
-add_focus_document_view(DocPid, #doc_set{focus_doc = FocusDoc0, background_docs = BgDocs0} = DocSet) ->
-	FocusDoc1 = #doc_view{pid = DocPid},
-	BgDocs1 = case FocusDoc0 of
-		undefined -> BgDocs0;
-		_ -> [FocusDoc0|BgDocs0]
-	end,
-	{ok, DocSet#doc_set{focus_doc = FocusDoc1, background_docs = BgDocs1}}.
-
-remove_document_view(DocPid, #doc_set{focus_doc = #doc_view{pid = DocPid}, background_docs = BgDocs0} = DocSet) ->
-	case BgDocs0 of
-		[BgDoc|BgDocsT] ->
-			FocusDoc1 = BgDoc,
-			BgDocs1 = BgDocsT;
-		[] ->
-			FocusDoc1 = undefined,
-			BgDocs1 = []
-	end,
-	{ok, DocSet#doc_set{focus_doc = FocusDoc1, background_docs = BgDocs1}};
-remove_document_view(DocPid, #doc_set{focus_doc = FocusDoc, background_docs = BgDocs0} = DocSet) ->
-	BgDocs1 = lists:filter(fun (Doc) -> case Doc of #doc_view{pid = DocPid} -> false; _Other -> true end end, BgDocs0),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc, background_docs = BgDocs1}}.
-
-update_document_view_buffer(DocPid, #doc_set{focus_doc = #doc_view{pid = DocPid} = FocusDoc0, background_docs = BgDocs0} = DocSet, Buffer) ->
-	FocusDoc1 = FocusDoc0#doc_view{buffer = Buffer},
-	{ok, DocSet#doc_set{focus_doc = FocusDoc1, background_docs = BgDocs0}};
-update_document_view_buffer(DocPid, #doc_set{focus_doc = FocusDoc0, background_docs = BgDocs0} = DocSet, Buffer) ->
-	BgDocs1 = lists:map(fun (Doc) -> case Doc of #doc_view{pid = DocPid} -> Doc#doc_view{buffer = Buffer}; Other -> Other end end, BgDocs0),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc0, background_docs = BgDocs1}}.
-
-move_caret_left_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_left(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
-
-move_caret_right_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_right(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
-
-move_caret_up_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_up(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
-
-move_caret_down_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_down(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
-
-move_caret_to_line_start_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_to_beginning_of_line(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
-
-move_caret_to_line_end_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_to_end_of_line(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
-
-move_caret_up_one_page_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_up_one_page(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
-
-move_caret_down_one_page_in_focus_doc(#doc_set{focus_doc = #doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
-	Caret1 = ee_caret:move_down_one_page(Caret0, Buffer),
-	{ok, DocSet#doc_set{focus_doc = FocusDoc#doc_view{caret = Caret1}}}.
