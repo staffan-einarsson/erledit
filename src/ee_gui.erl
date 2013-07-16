@@ -83,6 +83,7 @@ handle_info(#ee_pubsub_message{message = {buffer_update, Buffer}, publisher = Do
 	{noreply, State#state{doc_set = DocSet1}};
 handle_info(timeout, State) ->
 	wx:new(),
+	ee_document_sup:open_document("readme"),
 	{noreply, State#state{win = create_window()}};
 handle_info(Msg, _State) ->
 	erlang:error({bad_info, Msg}).
@@ -94,8 +95,16 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ===================================================================
 
-handle_key(#wxKey{type = char, keyCode = ?WXK_F1}, State) ->
-	ee_document_sup:open_document("readme"),
+handle_key(#wxKey{type = char, keyCode = ?WXK_F1}, #state{win = #main_window{window = Window}} = State) ->
+	FileDialog = wxFileDialog:new(Window),
+	case wxFileDialog:showModal(FileDialog) of
+		?wxID_OK ->
+			FilePath = wxFileDialog:getPath(FileDialog),
+			ee_document_sup:open_document(FilePath);
+		_ ->
+			ok
+	end,
+	wxFileDialog:destroy(FileDialog),
 	State;
 handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
