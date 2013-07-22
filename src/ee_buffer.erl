@@ -21,7 +21,8 @@
 	get_line_length/1,
 	get_num_lines/1,
 	foreach_line/2,
-	new_buffer_coords/2
+	new_buffer_coords/2,
+	to_string/1
 	]).
 
 -include("ee_global.hrl").
@@ -79,6 +80,9 @@ foreach_line(#ee_buffer{lines = Lines}, Fun) ->
 
 new_buffer_coords(LineNo, LineOffset) ->
 	#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}.
+
+to_string(#ee_buffer{lines = Lines}) ->
+	lines_to_string(Lines, []).
 
 %% ===================================================================
 %% Internal functions
@@ -149,3 +153,13 @@ add_to_line_no([], _) ->
 	[];
 add_to_line_no([#ee_buffer_line{line_no = LineNo} = Line|T], Number) ->
 	[Line#ee_buffer_line{line_no = LineNo + Number}|add_to_line_no(T, Number)].
+
+lines_to_string([], AccText) ->
+	AccText;
+lines_to_string([#ee_buffer_line{contents = Text, eol = Eol}|T], AccText) ->
+	lines_to_string(T, AccText ++ Text ++ encode_eol(Eol)).
+
+encode_eol(none) -> [];
+encode_eol(eol_lf) -> [?ASCII_LF];
+encode_eol(eol_crlf) -> [?ASCII_CR, ?ASCII_LF].
+	
