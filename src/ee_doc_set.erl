@@ -19,7 +19,8 @@
 	move_caret_to_line_start_in_focus_doc/1,
 	move_caret_to_line_end_in_focus_doc/1,
 	move_caret_up_one_page_in_focus_doc/1,
-	move_caret_down_one_page_in_focus_doc/1
+	move_caret_down_one_page_in_focus_doc/1,
+	cycle_focus_doc/1
 	]).
 
 -include("ee_global.hrl").
@@ -89,6 +90,14 @@ move_caret_up_one_page_in_focus_doc(#ee_doc_set{focus_doc = #ee_doc_view{buffer 
 move_caret_down_one_page_in_focus_doc(#ee_doc_set{focus_doc = #ee_doc_view{buffer = Buffer, caret = Caret0} = FocusDoc} = DocSet) ->
 	Caret1 = ee_caret:move_down_one_page(Caret0, Buffer),
 	{ok, DocSet#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}}}.
+
+cycle_focus_doc(#ee_doc_set{background_docs = []} = DocSet) ->
+	DocSet;
+cycle_focus_doc(#ee_doc_set{focus_doc = FocusDoc0, background_docs = BgDocs0} = DocSet) ->
+	[FocusDoc1|RevBgDocs1] = lists:reverse(BgDocs0),
+	BgDocs2 = lists:reverse(RevBgDocs1),
+	BgDocs3 = [FocusDoc0|BgDocs2],
+	DocSet#ee_doc_set{focus_doc = FocusDoc1, background_docs = BgDocs3}.
 
 %% ===================================================================
 %% Internal functions

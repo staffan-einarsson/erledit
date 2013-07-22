@@ -33,6 +33,7 @@
 -define(BLINK_INTERVAL, 300).
 -define(WXK_CTRL_O, 15).
 -define(WXK_CTRL_S, 19).
+-define(WXK_CTRL_W, 23).
 
 %% ===================================================================
 %% API
@@ -108,6 +109,10 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ===================================================================
 
+handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_W}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+	DocSet1 = ee_doc_set:cycle_focus_doc(DocSet0),
+	wxFrame:refresh(Window),
+	State#state{doc_set = DocSet1};
 handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_S}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
 	ee_buffer_server:save_file(FocusDocPid),
 	State;
