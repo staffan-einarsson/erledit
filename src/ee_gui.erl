@@ -31,6 +31,7 @@
 -record(state, {win = #main_window{}, doc_set = #ee_doc_set{}, blink_caret = #blink_caret{}}).
 
 -define(BLINK_INTERVAL, 300).
+-define(WXK_CTRL_O, 15).
 
 %% ===================================================================
 %% API
@@ -106,7 +107,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ===================================================================
 
-handle_key(#wxKey{type = char, keyCode = ?WXK_F1}, #state{win = #main_window{window = Window}} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_O}, #state{win = #main_window{window = Window}} = State) ->
 	FileDialog = wxFileDialog:new(Window),
 	case wxFileDialog:showModal(FileDialog) of
 		?wxID_OK ->
@@ -184,8 +185,8 @@ handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{doc_set = DocSet0} = S
 	Caret1 = ee_caret:move_to(Caret0#ee_caret{col_no = ColNo + 1}, Buffer),
 	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
 	State#state{doc_set = DocSet1};
-handle_key(#wxKey{type = char, keyCode = KeyCode}, State) ->
-	io:format("Ignored key: ~p~n", [KeyCode]),
+handle_key(#wxKey{} = KeyEvent, State) ->
+	io:format("Ignored key event: ~p~n", [KeyEvent]),
 	State.
 
 create_window() ->
