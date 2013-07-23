@@ -31,11 +31,17 @@
 -record(state, {win = #main_window{}, doc_set = #ee_doc_set{}, blink_caret = #blink_caret{}}).
 
 -define(BLINK_INTERVAL, 300).
+-define(NUMBER_MARGIN_START, 0).
+-define(NUMBER_MARGIN_WIDTH, 40).
+-define(TEXT_MARGIN_START, (?NUMBER_MARGIN_START + ?NUMBER_MARGIN_WIDTH)).
+-define(TEXT_MARGIN_WIDTH, 15).
+-define(TEXT_AREA_START, (?TEXT_MARGIN_START + ?TEXT_MARGIN_WIDTH)).
 -define(WXK_CTRL_N, 14).
 -define(WXK_CTRL_O, 15).
 -define(WXK_CTRL_Q, 17).
 -define(WXK_CTRL_S, 19).
 -define(WXK_CTRL_W, 23).
+
 
 %% ===================================================================
 %% API
@@ -220,7 +226,7 @@ handle_key(#wxKey{} = KeyEvent, State) ->
 
 create_window() ->
 	%% Create the window.
-	Window = wxFrame:new(wx:null(), -1, "erledit", [{size, {600, 400}}]),
+	Window = wxFrame:new(wx:null(), -1, "erledit", [{size, {800, 600}}]),
 	StatusBar = wxFrame:createStatusBar(Window),
 	ok = wxStatusBar:setStatusText(StatusBar, ""),
 
@@ -232,7 +238,8 @@ create_window() ->
 		),
 
 	%% Show window.
-	wxWindow:show(Window),
+	wxFrame:show(Window),
+	wxFrame:maximize(Window),
 	#main_window{window = Window, status_bar = StatusBar}.
 
 handle_paint(#wx{obj = Window}, _WxObject) ->
@@ -246,11 +253,22 @@ draw_buffer(Window, undefined, _, _) ->
 	ok;
 draw_buffer(Window, Buffer, Caret, BlinkCaretState) ->
 	DC = wxPaintDC:new(Window),
+	{_Width, Height} = wxDC:getSize(DC),
 	ok = wxDC:setBackground(DC, ?wxWHITE_BRUSH),
 	Font = wxFont:new(10, ?wxFONTFAMILY_TELETYPE, ?wxFONTSTYLE_NORMAL, ?wxFONTWEIGHT_NORMAL),
 	ok = wxDC:setFont(DC, Font),
 	{SpaceWidth, LineHeight} = wxDC:getTextExtent(DC, " "),
 	ok = wxDC:clear(DC),
+	wxDC:setPen(DC, ?wxTRANSPARENT_PEN),
+	Brush0 = wxBrush:new({228, 228, 228}),
+	wxDC:setBrush(DC, Brush0),
+	wxDC:drawRectangle(DC, {?NUMBER_MARGIN_START, 0, ?NUMBER_MARGIN_WIDTH, Height}),
+	Brush1 = wxBrush:new({247, 247, 247}),
+	wxDC:setBrush(DC, Brush1),
+	wxBrush:destroy(Brush0),
+	wxDC:drawRectangle(DC, {?TEXT_MARGIN_START, 0, ?TEXT_MARGIN_WIDTH, Height}),
+	wxDC:setBrush(DC, ?wxGREY_BRUSH),
+	wxBrush:destroy(Brush1),
 	ok = draw_buffer_lines(DC, Buffer, LineHeight, SpaceWidth),
 	case BlinkCaretState of
 		on ->
@@ -264,7 +282,7 @@ draw_buffer(Window, Buffer, Caret, BlinkCaretState) ->
 
 draw_buffer_lines(DC, Buffer, LineHeight, SpaceWidth) ->
 	ee_buffer:foreach_line(Buffer,
-		fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], 0, (ee_buffer:get_line_number(Line) - 1) * LineHeight, SpaceWidth) end
+		fun(Line) -> ok = draw_buffer_line(DC, ee_buffer:get_line_contents(Line), [], ?TEXT_AREA_START, (ee_buffer:get_line_number(Line) - 1) * LineHeight, SpaceWidth) end
 		).
 
 draw_buffer_line(DC, [], LiteralCharsRev, XStart, Y, _) ->
@@ -274,23 +292,24 @@ draw_buffer_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y, SpaceWidth) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
 	{W, _} = wxDC:getTextExtent(DC, LiteralChars),
 	ok = wxDC:drawText(DC, LiteralChars, {XStart, Y}),
-	draw_buffer_line(DC, T, [], (((XStart + W) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth), Y, SpaceWidth);
+	draw_buffer_line(DC, T, [], (((XStart + W - ?TEXT_AREA_START) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth) + ?TEXT_AREA_START, Y, SpaceWidth);
 draw_buffer_line(DC, [Char|T], LiteralCharsRev, XStart, Y, SpaceWidth) ->
 	draw_buffer_line(DC, T, [Char|LiteralCharsRev], XStart, Y, SpaceWidth).
 
 draw_caret(DC, Buffer, Caret, LineHeight, SpaceWidth) ->
 	#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset} = ee_caret:caret_to_buffer_coords(Caret, Buffer),
 	Line = ee_buffer:get_line(Buffer, LineNo),
-	draw_caret_on_line(DC, lists:sublist(ee_buffer:get_line_contents(Line), LineOffset - 1), [], 0, (LineNo - 1) * LineHeight, LineHeight, SpaceWidth).
+	draw_caret_on_line(DC, lists:sublist(ee_buffer:get_line_contents(Line), LineOffset - 1), [], ?TEXT_AREA_START, (LineNo - 1) * LineHeight, LineHeight, SpaceWidth).
 
 draw_caret_on_line(DC, [], LiteralCharsRev, XStart, Y, H, _) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
 	{W, _} = wxDC:getTextExtent(DC, LiteralChars),
+	wxDC:setPen(DC, ?wxBLACK_PEN),
 	ok = wxDC:drawLine(DC, {XStart + W, Y}, {XStart + W, Y + H});
 draw_caret_on_line(DC, [?ASCII_TAB|T], LiteralCharsRev, XStart, Y, H, SpaceWidth) ->
 	LiteralChars = lists:reverse(LiteralCharsRev),
 	{W, _} = wxDC:getTextExtent(DC, LiteralChars),
-	draw_caret_on_line(DC, T, [], (((XStart + W) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth), Y, H, SpaceWidth);
+	draw_caret_on_line(DC, T, [], (((XStart + W - ?TEXT_AREA_START) div (4 * SpaceWidth)) + 1) * (4 * SpaceWidth) + ?TEXT_AREA_START, Y, H, SpaceWidth);
 draw_caret_on_line(DC, [Char|T], LiteralCharsRev, XStart, Y, H, SpaceWidth) ->
 	draw_caret_on_line(DC, T, [Char|LiteralCharsRev], XStart, Y, H, SpaceWidth).
 
