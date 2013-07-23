@@ -19,7 +19,8 @@
 	insert_eol/2,
 	insert_text/3,
 	save_file/1,
-	set_filename/2
+	set_filename/2,
+	close/1
 	]).
 
 %% gen_server callbacks
@@ -73,6 +74,9 @@ save_file(BufferServerPid) ->
 
 set_filename(BufferServerPid, FileName) ->
 	gen_server:cast(BufferServerPid, {set_filename, FileName}).
+
+close(BufferServerPid) ->
+	gen_server:cast(BufferServerPid, {close}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -129,6 +133,8 @@ handle_cast({save_file}, #state{filename = FileName, buffer = Buffer} = State) -
 handle_cast({set_filename, FileName}, State0) ->
 	State1 = State0#state{filename = FileName},
 	{noreply, State1};
+handle_cast({close}, State) ->
+	{stop, normal, State};
 handle_cast(Msg, _State) ->
 	erlang:error({bad_cast, Msg}).
 

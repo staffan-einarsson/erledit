@@ -33,6 +33,7 @@
 -define(BLINK_INTERVAL, 300).
 -define(WXK_CTRL_N, 14).
 -define(WXK_CTRL_O, 15).
+-define(WXK_CTRL_Q, 17).
 -define(WXK_CTRL_S, 19).
 -define(WXK_CTRL_W, 23).
 
@@ -142,6 +143,9 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_O}, #state{win = #main_window
 			ok
 	end,
 	wxFileDialog:destroy(FileDialog),
+	State;
+handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_Q}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
+	ee_buffer_server:close(FocusDocPid),
 	State;
 handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
