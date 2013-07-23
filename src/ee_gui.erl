@@ -31,6 +31,7 @@
 -record(state, {win = #main_window{}, doc_set = #ee_doc_set{}, blink_caret = #blink_caret{}}).
 
 -define(BLINK_INTERVAL, 300).
+-define(WXK_CTRL_N, 14).
 -define(WXK_CTRL_O, 15).
 -define(WXK_CTRL_S, 19).
 -define(WXK_CTRL_W, 23).
@@ -109,12 +110,27 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ===================================================================
 
+handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_N}, State) ->
+	ee_document_sup:open_document(),
+	State;
 handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_W}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	DocSet1 = ee_doc_set:cycle_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	State#state{doc_set = DocSet1};
-handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_S}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
-	ee_buffer_server:save_file(FocusDocPid),
+handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_S}, #state{win = #main_window{window = Window}, doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
+	case ee_buffer_server:save_file(FocusDocPid) of
+		ok -> ok;
+		no_filename ->
+			FileDialog = wxFileDialog:new(Window),
+			case wxFileDialog:showModal(FileDialog) of
+				?wxID_OK ->
+					FilePath = wxFileDialog:getPath(FileDialog),
+					ee_buffer_server:set_filename(FocusDocPid, FilePath),
+					ee_buffer_server:save_file(FocusDocPid);
+				_ ->
+					ok
+			end
+	end,
 	State;
 handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_O}, #state{win = #main_window{window = Window}} = State) ->
 	FileDialog = wxFileDialog:new(Window),

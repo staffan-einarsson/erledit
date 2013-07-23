@@ -18,7 +18,8 @@
 	remove_right/2,
 	insert_eol/2,
 	insert_text/3,
-	save_file/1
+	save_file/1,
+	set_filename/2
 	]).
 
 %% gen_server callbacks
@@ -68,15 +69,20 @@ insert_text(BufferServerPid, Text, #ee_buffer_coords{} = Coords) ->
 	gen_server:cast(BufferServerPid, {insert_text, Text, Coords}).
 
 save_file(BufferServerPid) ->
-	gen_server:cast(BufferServerPid, {save_file}).
+	gen_server:call(BufferServerPid, {try_save_file}).
 
+set_filename(BufferServerPid, FileName) ->
+	gen_server:cast(BufferServerPid, {set_filename, FileName}).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
-init(Args) ->
-	{filename, FileName} = proplists:lookup(filename, Args),
+init([Args]) ->
+	FileName = case proplists:lookup(filename, Args) of
+		{filename, FN} -> FN;
+		none -> undefined
+	end,
 	{ok, #state{filename = FileName, pubsub_state = ee_pubsub:new()}, 0}.
 
 terminate(_Reason, _State) ->
@@ -85,6 +91,13 @@ terminate(_Reason, _State) ->
 
 handle_call({get_buffer}, _From, #state{buffer = Buffer} = State) ->
 	{reply, {ok, Buffer}, State};
+handle_call({try_save_file}, _From, #state{filename = FileName} = State) ->
+	Result = check_filename(FileName),
+	case Result of
+		ok -> gen_server:cast(self(), {save_file});
+		_ -> false
+	end,
+	{reply, Result, State};
 handle_call(Msg, _From, _State) ->
 	erlang:error({bad_call, Msg}).
 
@@ -113,12 +126,19 @@ handle_cast({insert_text, Text, #ee_buffer_coords{} = Coords}, #state{buffer = B
 handle_cast({save_file}, #state{filename = FileName, buffer = Buffer} = State) ->
 	save_buffer_to_file(Buffer, FileName),
 	{noreply, State};
+handle_cast({set_filename, FileName}, State0) ->
+	State1 = State0#state{filename = FileName},
+	{noreply, State1};
 handle_cast(Msg, _State) ->
 	erlang:error({bad_cast, Msg}).
 
 handle_info(timeout, #state{filename = FileName} = State0) ->
 	ee_document_controller:insert(self()),
-	State1 = State0#state{buffer = load_buffer_from_file(FileName)},
+	Buffer = case FileName of
+		undefined -> ee_buffer:new();
+		_ -> load_buffer_from_file(FileName)
+	end,
+	State1 = State0#state{buffer = Buffer},
 	{noreply, State1};
 handle_info(Msg, _State) ->
 	erlang:error({bad_info, Msg}).
@@ -144,3 +164,8 @@ save_buffer_to_file(Buffer, FilePath) ->
 
 publish_buffer(PubsubState, Buffer) ->
 	ee_pubsub:publish(PubsubState, {buffer_update, Buffer}).
+
+check_filename(undefined) ->
+	no_filename;
+check_filename(_) ->
+	ok.

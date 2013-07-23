@@ -11,7 +11,8 @@
 %% API
 -export([
 	start_link/0,
-	open_document/1
+	open_document/1,
+	open_document/0
 	]).
 
 %% Supervisor callbacks
@@ -30,7 +31,10 @@ start_link() ->
 	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 open_document(FileName) ->
-	supervisor:start_child(?MODULE, [{filename, FileName}]).
+	{ok, _} = supervisor:start_child(?MODULE, [[{filename, FileName}]]).
+
+open_document() ->
+	{ok, _} = supervisor:start_child(?MODULE, [[]]).
 
 %% ===================================================================
 %% Supervisor callbacks

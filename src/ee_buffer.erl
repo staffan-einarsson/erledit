@@ -33,7 +33,7 @@
 %% ===================================================================
 
 new() ->
-	#ee_buffer{}.
+	#ee_buffer{lines = [#ee_buffer_line{}]}.
 
 create_from_string(String) ->
 	#ee_buffer{lines = split_buffer(String)}.
