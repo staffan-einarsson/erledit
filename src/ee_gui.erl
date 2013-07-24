@@ -36,12 +36,6 @@
 -define(TEXT_MARGIN_START, (?NUMBER_MARGIN_START + ?NUMBER_MARGIN_WIDTH)).
 -define(TEXT_MARGIN_WIDTH, 15).
 -define(TEXT_AREA_START, (?TEXT_MARGIN_START + ?TEXT_MARGIN_WIDTH)).
--define(WXK_CTRL_N, 14).
--define(WXK_CTRL_O, 15).
--define(WXK_CTRL_Q, 17).
--define(WXK_CTRL_S, 19).
--define(WXK_CTRL_W, 23).
-
 
 %% ===================================================================
 %% API
@@ -70,19 +64,47 @@ handle_call({get_buffer}, _From, #state{doc_set = #ee_doc_set{focus_doc = #ee_do
 	#blink_caret{state = BlinkCaretState} = BlinkCaret,
 	%% TODO: Encapsulate doc view in doc set API.
 	{reply, {Buffer, Caret, BlinkCaretState}, State};
+handle_call(#wx{event = #wxClose{}}, _From, #state{win = #main_window{window = Window}} = State) ->
+	wxWindow:destroy(Window),
+	init:stop(),
+	{reply, ok, State};
+handle_call(#wx{event = #wxKey{} = KeyEvent}, _From, #state{blink_caret = BlinkCaret0} = State0) ->
+	BlinkCaret1 = blink_caret_reset(BlinkCaret0),
+	{Result, State1} = handle_key(KeyEvent, State0),
+	State2 = State1#state{blink_caret = BlinkCaret1},
+	{reply, Result, State2};
 handle_call(Msg, _From, _State) ->
 	erlang:error({bad_call, Msg}).
 
+handle_cast({save_file}, #state{win = #main_window{window = Window}, doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
+	case ee_buffer_server:save_file(FocusDocPid) of
+		ok -> ok;
+		no_filename ->
+			FileDialog = wxFileDialog:new(Window),
+			case wxFileDialog:showModal(FileDialog) of
+				?wxID_OK ->
+					FilePath = wxFileDialog:getPath(FileDialog),
+					ee_buffer_server:set_filename(FocusDocPid, FilePath),
+					ee_buffer_server:save_file(FocusDocPid);
+				_ ->
+					ok
+			end
+	end,
+	{noreply, State};
+handle_cast({open_file}, #state{win = #main_window{window = Window}} = State) ->
+	FileDialog = wxFileDialog:new(Window),
+	case wxFileDialog:showModal(FileDialog) of
+		?wxID_OK ->
+			FilePath = wxFileDialog:getPath(FileDialog),
+			ee_document_sup:open_document(FilePath);
+		_ ->
+			ok
+	end,
+	wxFileDialog:destroy(FileDialog),
+	{noreply, State};
 handle_cast(Msg, _State) ->
 	erlang:error({bad_cast, Msg}).
 
-handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
-	wxWindow:destroy(Window),
-	init:stop(),
-	{stop, normal, State};
-handle_info(#wx{event = #wxKey{} = KeyEvent}, #state{blink_caret = BlinkCaret0} = State) ->
-	BlinkCaret1 = blink_caret_reset(BlinkCaret0),
-	{noreply, handle_key(KeyEvent, State#state{blink_caret = BlinkCaret1})};
 handle_info(#ee_pubsub_message{message = {document_inserted, DocPid}}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
 	ee_buffer_server:add_subscriber(DocPid, self()),
@@ -118,74 +140,56 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ===================================================================
 
-handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_N}, State) ->
+handle_key(#wxKey{type = key_down, keyCode = $N, controlDown = true}, State) ->
 	ee_document_sup:open_document(),
-	State;
-handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_W}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+	{ok, State};
+handle_key(#wxKey{type = key_down, keyCode = $W, controlDown = true}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	DocSet1 = ee_doc_set:cycle_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
-handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_S}, #state{win = #main_window{window = Window}, doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
-	case ee_buffer_server:save_file(FocusDocPid) of
-		ok -> ok;
-		no_filename ->
-			FileDialog = wxFileDialog:new(Window),
-			case wxFileDialog:showModal(FileDialog) of
-				?wxID_OK ->
-					FilePath = wxFileDialog:getPath(FileDialog),
-					ee_buffer_server:set_filename(FocusDocPid, FilePath),
-					ee_buffer_server:save_file(FocusDocPid);
-				_ ->
-					ok
-			end
-	end,
-	State;
-handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_O}, #state{win = #main_window{window = Window}} = State) ->
-	FileDialog = wxFileDialog:new(Window),
-	case wxFileDialog:showModal(FileDialog) of
-		?wxID_OK ->
-			FilePath = wxFileDialog:getPath(FileDialog),
-			ee_document_sup:open_document(FilePath);
-		_ ->
-			ok
-	end,
-	wxFileDialog:destroy(FileDialog),
-	State;
-handle_key(#wxKey{type = char, keyCode = ?WXK_CTRL_Q}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
+	{ok, State#state{doc_set = DocSet1}};
+handle_key(#wxKey{type = key_down, keyCode = $S, controlDown = true}, State) ->
+	%% Open a file. This is a blocking operation so we delegate it to a cast and avoid blocking the caller.
+	gen_server:cast(?MODULE, {save_file}),
+	{ok, State};
+handle_key(#wxKey{type = key_down, keyCode = $O, controlDown = true}, State) ->
+	%% Open a file. This is a blocking operation so we delegate it to a cast and avoid blocking the caller.
+	gen_server:cast(?MODULE, {open_file}),
+	{ok, State};
+handle_key(#wxKey{type = key_down, keyCode = $Q, controlDown = true}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
 	ee_buffer_server:close(FocusDocPid),
-	State;
+	{ok, State};
 handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_RIGHT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_right_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_UP}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_up_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_DOWN}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_down_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_HOME}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_to_line_start_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_END}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_to_line_end_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEUP}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_up_one_page_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_down_one_page_in_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret0} = FocusDoc} = DocSet0,
@@ -193,18 +197,18 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{doc_set = DocSet0}
 	%% TODO: Avoid changing caret directly. Waiting for #29.
 	Caret1 = Caret0#ee_caret{line_no = LineNo + 1, col_no = 1},
 	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet0,
 	ee_buffer_server:remove_left(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{doc_set = DocSet} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet,
 	ee_buffer_server:remove_right(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
-	State;	
+	{ok, State};
 handle_key(#wxKey{type = char, keyCode = ?WXK_TAB}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
@@ -212,7 +216,7 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_TAB}, #state{doc_set = DocSet0} = 
 	%% TODO: Simplify this caret movement.
 	Caret1 = ee_caret:move_to(Caret0#ee_caret{col_no = ColNo + 4}, Buffer),
 	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{doc_set = DocSet0} = State) when KeyCode > 31, KeyCode < 256 ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
@@ -220,10 +224,10 @@ handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{doc_set = DocSet0} = S
 	%% TODO: Simplify this caret movement.
 	Caret1 = ee_caret:move_to(Caret0#ee_caret{col_no = ColNo + 1}, Buffer),
 	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
-	State#state{doc_set = DocSet1};
+	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{} = KeyEvent, State) ->
 	io:format("Ignored key event: ~p~n", [KeyEvent]),
-	State.
+	{skip, State}.
 
 create_window() ->
 	%% Create the window.
@@ -232,8 +236,10 @@ create_window() ->
 	ok = wxStatusBar:setStatusText(StatusBar, ""),
 
 	%% Subscribe to events.
-	wxFrame:connect(Window, close_window),
-	wxFrame:connect(Window, char),
+	wxFrame:connect(Window, close_window, [{callback, fun handle_wx_event/2}]),
+	wxFrame:connect(Window, char, [{callback, fun handle_wx_event/2}]),
+	wxFrame:connect(Window, key_down, [{callback, fun handle_wx_event/2}]),
+	wxFrame:connect(Window, key_up, [{callback, fun handle_wx_event/2}]),
 	wxFrame:connect(Window, paint
 		, [{callback, fun handle_paint/2}]
 		),
@@ -242,6 +248,15 @@ create_window() ->
 	wxFrame:show(Window),
 	wxFrame:maximize(Window),
 	#main_window{window = Window, status_bar = StatusBar}.
+
+handle_wx_event(WxMessage, WxEvent) ->
+	case gen_server:call(?MODULE, WxMessage) of
+		skip -> 
+			wxEvent:skip(WxEvent),
+			ok;
+		ok ->
+			ok
+	end.
 
 handle_paint(#wx{obj = Window}, _WxObject) ->
 	{Buffer, Caret, BlinkCaretState} = gen_server:call(?MODULE, {get_buffer}),
