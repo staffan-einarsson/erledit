@@ -78,6 +78,7 @@ handle_cast(Msg, _State) ->
 
 handle_info(#wx{event = #wxClose{}}, #state{win = #main_window{window = Window}} = State) ->
 	wxWindow:destroy(Window),
+	init:stop(),
 	{stop, normal, State};
 handle_info(#wx{event = #wxKey{} = KeyEvent}, #state{blink_caret = BlinkCaret0} = State) ->
 	BlinkCaret1 = blink_caret_reset(BlinkCaret0),

@@ -17,7 +17,7 @@
 %% ===================================================================
 
 start() ->
-	application:start(erledit).
+	application:start(erledit, permanent).
 
 stop() ->
 	application:stop(erledit).
