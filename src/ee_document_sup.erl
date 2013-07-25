@@ -41,5 +41,5 @@ open_document() ->
 %% ===================================================================
 
 init([]) ->
-	{ok, {{simple_one_for_one, 5, 10}, [?CHILD(ee_buffer_server, worker, [])]}}.
+	{ok, {{simple_one_for_one, 5, 10}, [?CHILD(ee_document, worker, [])]}}.
 

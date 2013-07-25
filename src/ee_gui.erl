@@ -76,15 +76,15 @@ handle_call(Msg, _From, _State) ->
 	erlang:error({bad_call, Msg}).
 
 handle_cast({save_file}, #state{win = #main_window{window = Window}, doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
-	case ee_buffer_server:save_file(FocusDocPid) of
+	case ee_document:save_file(FocusDocPid) of
 		ok -> ok;
 		no_filename ->
 			FileDialog = wxFileDialog:new(Window),
 			case wxFileDialog:showModal(FileDialog) of
 				?wxID_OK ->
 					FilePath = wxFileDialog:getPath(FileDialog),
-					ee_buffer_server:set_filename(FocusDocPid, FilePath),
-					ee_buffer_server:save_file(FocusDocPid);
+					ee_document:set_filename(FocusDocPid, FilePath),
+					ee_document:save_file(FocusDocPid);
 				_ ->
 					ok
 			end
@@ -106,8 +106,8 @@ handle_cast(Msg, _State) ->
 
 handle_info(#ee_pubsub_message{message = {document_inserted, DocPid}}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
-	ee_buffer_server:add_subscriber(DocPid, self()),
-	{ok, Buffer} = ee_buffer_server:get_buffer(DocPid),
+	ee_document:add_subscriber(DocPid, self()),
+	{ok, Buffer} = ee_document:get_buffer(DocPid),
 	%% TODO: Look intoif this is efficient (looking up the doc view by pid again)
 	{ok, DocSet2} = ee_doc_set:update_document_view_buffer(DocSet1, DocPid, Buffer),
 	wxFrame:refresh(Window),
@@ -160,7 +160,7 @@ handle_key(#wxKey{type = key_down, keyCode = $O, controlDown = true}, State) ->
 	{ok, State};
 handle_key(#wxKey{type = key_down, keyCode = ?WXK_F4, controlDown = true}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
 	%% Close document.
-	ee_buffer_server:close(FocusDocPid),
+	ee_document:close(FocusDocPid),
 	{ok, State};
 handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
@@ -197,7 +197,7 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_wind
 handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{line_no = LineNo} = Caret0} = FocusDoc} = DocSet0,
-	ee_buffer_server:insert_eol(DocPid, ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
+	ee_document:insert_eol(DocPid, ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
 	%% TODO: Avoid changing caret directly. Waiting for #29.
 	Caret1 = Caret0#ee_caret{line_no = LineNo + 1, col_no = 1},
 	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
@@ -205,18 +205,18 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{doc_set = DocSet0}
 handle_key(#wxKey{type = char, keyCode = ?WXK_BACK}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet0,
-	ee_buffer_server:remove_left(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
+	ee_document:remove_left(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
 	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_DELETE}, #state{doc_set = DocSet} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = Caret}} = DocSet,
-	ee_buffer_server:remove_right(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
+	ee_document:remove_right(DocPid, ee_caret:caret_to_buffer_coords(Caret, Buffer)),
 	{ok, State};
 handle_key(#wxKey{type = char, keyCode = ?WXK_TAB}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
-	ee_buffer_server:insert_text(DocPid, [?WXK_TAB], ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
+	ee_document:insert_text(DocPid, [?WXK_TAB], ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
 	%% TODO: Simplify this caret movement.
 	Caret1 = ee_caret:move_to(Caret0#ee_caret{col_no = ColNo + 4}, Buffer),
 	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
@@ -224,7 +224,7 @@ handle_key(#wxKey{type = char, keyCode = ?WXK_TAB}, #state{doc_set = DocSet0} = 
 handle_key(#wxKey{type = char, keyCode = KeyCode}, #state{doc_set = DocSet0} = State) when KeyCode > 31, KeyCode < 256 ->
 	%% TODO: Refactor so that doc_set internals are hidden.
 	#ee_doc_set{focus_doc = #ee_doc_view{pid = DocPid, buffer = Buffer, caret = #ee_caret{col_no = ColNo} = Caret0} = FocusDoc} = DocSet0,
-	ee_buffer_server:insert_text(DocPid, [KeyCode], ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
+	ee_document:insert_text(DocPid, [KeyCode], ee_caret:caret_to_buffer_coords(Caret0, Buffer)),
 	%% TODO: Simplify this caret movement.
 	Caret1 = ee_caret:move_to(Caret0#ee_caret{col_no = ColNo + 1}, Buffer),
 	DocSet1 = DocSet0#ee_doc_set{focus_doc = FocusDoc#ee_doc_view{caret = Caret1}},
