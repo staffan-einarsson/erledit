@@ -28,7 +28,6 @@
 	terminate/2, code_change/3]).
 
 -include("ee_global.hrl").
--include("ee_document.hrl").
 -include("ee_buffer.hrl").
 
 -record(state, {filename, buffer, pubsub_state}).

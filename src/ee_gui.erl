@@ -21,7 +21,6 @@
 
 -include("ee_global.hrl").
 -include_lib("wx/include/wx.hrl").
--include("ee_document.hrl").
 -include("ee_buffer.hrl").
 -include("ee_doc_set.hrl").
 -include("ee_pubsub.hrl").
