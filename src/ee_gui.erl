@@ -141,21 +141,26 @@ code_change(_OldVsn, State, _Extra) ->
 %% ===================================================================
 
 handle_key(#wxKey{type = key_down, keyCode = $N, controlDown = true}, State) ->
+	%% New document.
 	ee_document_sup:open_document(),
 	{ok, State};
-handle_key(#wxKey{type = key_down, keyCode = $W, controlDown = true}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = key_down, keyCode = ?WXK_TAB, controlDown = true}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+	%% Cycle open documents.
 	DocSet1 = ee_doc_set:cycle_focus_doc(DocSet0),
 	wxFrame:refresh(Window),
 	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = key_down, keyCode = $S, controlDown = true}, State) ->
-	%% Open a file. This is a blocking operation so we delegate it to a cast and avoid blocking the caller.
+	%% Save document.
+	%% This is a blocking operation so we delegate it to a cast and avoid blocking the caller.
 	gen_server:cast(?MODULE, {save_file}),
 	{ok, State};
 handle_key(#wxKey{type = key_down, keyCode = $O, controlDown = true}, State) ->
-	%% Open a file. This is a blocking operation so we delegate it to a cast and avoid blocking the caller.
+	%% Open document.
+	%% This is a blocking operation so we delegate it to a cast and avoid blocking the caller.
 	gen_server:cast(?MODULE, {open_file}),
 	{ok, State};
-handle_key(#wxKey{type = key_down, keyCode = $Q, controlDown = true}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
+handle_key(#wxKey{type = key_down, keyCode = ?WXK_F4, controlDown = true}, #state{doc_set = #ee_doc_set{focus_doc = #ee_doc_view{pid = FocusDocPid}}} = State) ->
+	%% Close document.
 	ee_buffer_server:close(FocusDocPid),
 	{ok, State};
 handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
