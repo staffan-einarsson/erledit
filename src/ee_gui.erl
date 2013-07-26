@@ -25,7 +25,7 @@
 -include("ee_doc_set.hrl").
 -include("ee_pubsub.hrl").
 
--record(main_window, {window, status_bar}).
+-record(main_window, {window, text_panel, text_cursor, status_bar}).
 -record(blink_caret, {state = on, timer}).
 -record(state, {win = #main_window{}, doc_set = #ee_doc_set{}, blink_caret = #blink_caret{}}).
 
@@ -63,8 +63,8 @@ handle_call({get_buffer}, _From, #state{doc_set = #ee_doc_set{focus_doc = #ee_do
 	#blink_caret{state = BlinkCaretState} = BlinkCaret,
 	%% TODO: Encapsulate doc view in doc set API.
 	{reply, {Buffer, Caret, BlinkCaretState}, State};
-handle_call(#wx{event = #wxClose{}}, _From, #state{win = #main_window{window = Window}} = State) ->
-	wxWindow:destroy(Window),
+handle_call(#wx{event = #wxClose{}}, _From, #state{win = Window} = State) ->
+	destroy_window(Window),
 	init:stop(),
 	{reply, ok, State};
 handle_call(#wx{event = #wxKey{} = KeyEvent}, _From, #state{blink_caret = BlinkCaret0} = State0) ->
@@ -104,24 +104,24 @@ handle_cast({open_file}, #state{win = #main_window{window = Window}} = State) ->
 handle_cast(Msg, _State) ->
 	erlang:error({bad_cast, Msg}).
 
-handle_info(#ee_pubsub_message{message = {document_inserted, DocPid}}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_info(#ee_pubsub_message{message = {document_inserted, DocPid}}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
 	ee_document:add_subscriber(DocPid, self()),
 	{ok, Buffer} = ee_document:get_buffer(DocPid),
 	%% TODO: Look intoif this is efficient (looking up the doc view by pid again)
 	{ok, DocSet2} = ee_doc_set:update_document_view_buffer(DocSet1, DocPid, Buffer),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{noreply, State#state{doc_set = DocSet2}};
 handle_info(#ee_pubsub_message{message = {document_deleted, DocPid}}, #state{doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:remove_document_view(DocSet0, DocPid),
 	{noreply, State#state{doc_set = DocSet1}};
-handle_info(#ee_pubsub_message{message = {buffer_update, Buffer}, publisher = DocPid}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_info(#ee_pubsub_message{message = {buffer_update, Buffer}, publisher = DocPid}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:update_document_view_buffer(DocSet0, DocPid, Buffer),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{noreply, State#state{doc_set = DocSet1}};
-handle_info(blink_caret, #state{win = #main_window{window = Window}, blink_caret = BlinkCaret0} = State) ->
+handle_info(blink_caret, #state{win = #main_window{text_panel = TextPanel}, blink_caret = BlinkCaret0} = State) ->
 	BlinkCaret1 = blink_caret(BlinkCaret0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{noreply, State#state{blink_caret = BlinkCaret1}};
 handle_info(timeout, State) ->
 	wx:new(),
@@ -143,10 +143,10 @@ handle_key(#wxKey{type = key_down, keyCode = $N, controlDown = true}, State) ->
 	%% New document.
 	ee_document_sup:open_document(),
 	{ok, State};
-handle_key(#wxKey{type = key_down, keyCode = ?WXK_TAB, controlDown = true}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = key_down, keyCode = ?WXK_TAB, controlDown = true}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	%% Cycle open documents.
 	DocSet1 = ee_doc_set:cycle_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = key_down, keyCode = $S, controlDown = true}, State) ->
 	%% Save document.
@@ -162,37 +162,37 @@ handle_key(#wxKey{type = key_down, keyCode = ?WXK_F4, controlDown = true}, #stat
 	%% Close document.
 	ee_document:close(FocusDocPid),
 	{ok, State};
-handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_LEFT}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_left_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_RIGHT}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_RIGHT}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_right_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_UP}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_UP}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_up_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_DOWN}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_DOWN}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_down_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_HOME}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_HOME}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_to_line_start_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_END}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_END}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_to_line_end_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEUP}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEUP}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_up_one_page_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
-handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_window{window = Window}, doc_set = DocSet0} = State) ->
+handle_key(#wxKey{type = char, keyCode = ?WXK_PAGEDOWN}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:move_caret_down_one_page_in_focus_doc(DocSet0),
-	wxFrame:refresh(Window),
+	wxFrame:refresh(TextPanel),
 	{ok, State#state{doc_set = DocSet1}};
 handle_key(#wxKey{type = char, keyCode = ?WXK_RETURN}, #state{doc_set = DocSet0} = State) ->
 	%% TODO: Refactor so that doc_set internals are hidden.
@@ -235,23 +235,33 @@ handle_key(#wxKey{} = KeyEvent, State) ->
 
 create_window() ->
 	%% Create the window.
-	Window = wxFrame:new(wx:null(), -1, "erledit", [{size, {800, 600}}]),
+	Window = wxFrame:new(wx:null(), ?wxID_ANY, "erledit", [{size, {800, 600}}, {style, ?wxDEFAULT_FRAME_STYLE}]),
 	StatusBar = wxFrame:createStatusBar(Window),
-	ok = wxStatusBar:setStatusText(StatusBar, ""),
+	TextPanel = wxPanel:new(Window, [{style, ?wxVSCROLL bor ?wxHSCROLL}]),
+	TextCursor = wxCursor:new(?wxCURSOR_IBEAM),
+	wxFrame:setCursor(TextPanel, TextCursor),
 
 	%% Subscribe to events.
 	wxFrame:connect(Window, close_window, [{callback, fun handle_wx_event/2}]),
-	wxFrame:connect(Window, char, [{callback, fun handle_wx_event/2}]),
-	wxFrame:connect(Window, key_down, [{callback, fun handle_wx_event/2}]),
-	wxFrame:connect(Window, key_up, [{callback, fun handle_wx_event/2}]),
-	wxFrame:connect(Window, paint
+	wxFrame:connect(TextPanel, char, [{callback, fun handle_wx_event/2}]),
+	wxFrame:connect(TextPanel, key_down, [{callback, fun handle_wx_event/2}]),
+	wxFrame:connect(TextPanel, key_up, [{callback, fun handle_wx_event/2}]),
+	wxFrame:connect(TextPanel, paint
 		, [{callback, fun handle_paint/2}]
 		),
 
 	%% Show window.
+	ok = wxStatusBar:setStatusText(StatusBar, ""),
 	wxFrame:show(Window),
 	wxFrame:maximize(Window),
-	#main_window{window = Window, status_bar = StatusBar}.
+	#main_window{window = Window, text_panel = TextPanel, text_cursor = TextCursor, status_bar = StatusBar}.
+
+destroy_window(#main_window{window = Window, text_panel = TextPanel, text_cursor = TextCursor, status_bar = StatusBar}) ->
+	wxCursor:destroy(TextCursor),
+	wxPanel:destroy(TextPanel),
+	wxStatusBar:destroy(StatusBar),
+	wxFrame:destroy(Window),
+	ok.
 
 handle_wx_event(WxMessage, WxEvent) ->
 	case gen_server:call(?MODULE, WxMessage) of
