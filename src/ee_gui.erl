@@ -50,7 +50,6 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-	ee_document_controller:add_subscriber(self()),
 	{ok, #state{}, 0}.
 
 terminate(_Reason, _State) ->
@@ -105,13 +104,9 @@ handle_cast(Msg, _State) ->
 	erlang:error({bad_cast, Msg}).
 
 handle_info(#ee_pubsub_message{message = {document_inserted, DocPid}}, #state{win = #main_window{text_panel = TextPanel}, doc_set = DocSet0} = State) ->
-	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
-	ee_document:add_subscriber(DocPid, self()),
-	{ok, Buffer} = ee_document:get_buffer(DocPid),
-	%% TODO: Look intoif this is efficient (looking up the doc view by pid again)
-	{ok, DocSet2} = ee_doc_set:update_document_view_buffer(DocSet1, DocPid, Buffer),
+	DocSet1 = add_document_view(DocPid, DocSet0),
 	wxFrame:refresh(TextPanel),
-	{noreply, State#state{doc_set = DocSet2}};
+	{noreply, State#state{doc_set = DocSet1}};
 handle_info(#ee_pubsub_message{message = {document_deleted, DocPid}}, #state{doc_set = DocSet0} = State) ->
 	{ok, DocSet1} = ee_doc_set:remove_document_view(DocSet0, DocPid),
 	{noreply, State#state{doc_set = DocSet1}};
@@ -125,10 +120,14 @@ handle_info(blink_caret, #state{win = #main_window{text_panel = TextPanel}, blin
 	{noreply, State#state{blink_caret = BlinkCaret1}};
 handle_info(timeout, State) ->
 	wx:new(),
+	%% TODO: Possible race. Make atomic operation.
+	ee_document_controller:add_subscriber(self()),
+	{ok, Docs} = ee_document_controller:get_documents(),
+	DocSet = lists:foldl(fun add_document_view/2, ee_doc_set:new(), Docs),
 	ee_document_sup:open_document("readme"),
 	BlinkCaret = blink_caret_start(),
 	Window = create_window(),
-	{noreply, State#state{win = Window, blink_caret = BlinkCaret}};
+	{noreply, State#state{win = Window, doc_set = DocSet, blink_caret = BlinkCaret}};
 handle_info(Msg, _State) ->
 	erlang:error({bad_info, Msg}).
 
@@ -138,6 +137,14 @@ code_change(_OldVsn, State, _Extra) ->
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+add_document_view(DocPid, DocSet0) ->
+	{ok, DocSet1} = ee_doc_set:add_focus_document_view(DocSet0, DocPid),
+	ee_document:add_subscriber(DocPid, self()),
+	{ok, Buffer} = ee_document:get_buffer(DocPid),
+	%% TODO: Look intoif this is efficient (looking up the doc view by pid again)
+	{ok, DocSet2} = ee_doc_set:update_document_view_buffer(DocSet1, DocPid, Buffer),
+	DocSet2.
 
 handle_key(#wxKey{type = key_down, keyCode = $N, controlDown = true}, State) ->
 	%% New document.

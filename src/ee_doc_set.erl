@@ -9,6 +9,7 @@
 
 %% API
 -export([
+	new/0,
 	add_focus_document_view/2,
 	remove_document_view/2,
 	update_document_view_buffer/3,
@@ -29,6 +30,9 @@
 %% ===================================================================
 %% API
 %% ===================================================================
+
+new() ->
+	#ee_doc_set{}.
 
 add_focus_document_view(#ee_doc_set{focus_doc = FocusDoc0, background_docs = BgDocs0} = DocSet, DocPid) ->
 	FocusDoc1 = #ee_doc_view{pid = DocPid},
