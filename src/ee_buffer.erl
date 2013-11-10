@@ -25,6 +25,7 @@
 	to_string/1
 	]).
 
+-include_lib("eunit/include/eunit.hrl").
 -include("ee_global.hrl").
 -include("ee_buffer.hrl").
 
@@ -35,34 +36,69 @@
 new() ->
 	#ee_buffer{lines = [#ee_buffer_line{}]}.
 
+new_test_() -> [
+	?_assert(new() =:= #ee_buffer{lines = [#ee_buffer_line{}]})
+	].
+
 create_from_string(String) ->
 	#ee_buffer{lines = split_buffer(String)}.
+
+create_from_string_test_() -> [
+	?_assertEqual(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "", eol = none}]}, create_from_string("")),
+	?_assertEqual(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Hello", eol = none}]}, create_from_string("Hello")),
+	?_assertEqual(#ee_buffer{lines = [
+		#ee_buffer_line{line_no = 1, contents = "Hello", eol = eol_lf},
+		#ee_buffer_line{line_no = 2, contents = "World", eol = none}
+		]},
+		create_from_string("Hello\nWorld"))
+	].
 
 insert_text(#ee_buffer{lines = Lines} = Buffer, Text, #ee_buffer_coords{} = InsertCoords) ->
 	Buffer#ee_buffer{lines = insert_text_(Lines, Text, InsertCoords)}.
 
+insert_text_test_() -> [
+	].
+
 insert_eol(#ee_buffer{lines = Lines} = Buffer, #ee_buffer_coords{} = InsertCoords) ->
 	Buffer#ee_buffer{lines = ?dbg_print(insert_eol_(Lines, InsertCoords))}.
 
+insert_eol_test_() -> [
+	].
+
 remove_left(#ee_buffer{lines = Lines} = Buffer, #ee_buffer_coords{} = RemoveCoords) ->
 	Buffer#ee_buffer{lines = remove_left_(Lines, RemoveCoords)}.
-	
+
+remove_left_test_() -> [
+	].
+
 remove_right(#ee_buffer{lines = Lines} = Buffer, #ee_buffer_coords{} = RemoveCoords) ->
 	#ee_buffer_line{contents = LastLineContents} = lists:last(Lines),
 	Buffer#ee_buffer{lines = remove_right_(Lines, RemoveCoords, length(LastLineContents))}.
+
+remove_right_test_() -> [
+	].
 
 get_line(#ee_buffer{lines = Lines}, LineNo) when LineNo >= 1, LineNo =< length(Lines) ->
 	lists:nth(LineNo, Lines);
 get_line(_Buffer, _LineNo) ->
 	invalid_line.
 
+get_line_test_() -> [
+	].
+
 get_line_number(#ee_buffer_line{line_no = LineNo}) ->
 	LineNo.
+
+get_line_number_test_() -> [
+	].
 
 get_line_contents(invalid_line) ->
 	no_contents;
 get_line_contents(#ee_buffer_line{contents = Contents}) ->
 	Contents.
+
+get_line_contents_test_() -> [
+	].
 
 get_line_length(Buffer, LineNo) ->
 	get_line_length(get_line(Buffer, LineNo)).
@@ -72,17 +108,32 @@ get_line_length(#ee_buffer_line{contents = Contents}) ->
 get_line_length(invalid_line) ->
 	invalid_line.
 
+get_line_length_test_() -> [
+	].
+
 get_num_lines(#ee_buffer{lines = Lines}) ->
 	length(Lines).
+
+get_num_lines_test_() -> [
+	].
 
 foreach_line(#ee_buffer{lines = Lines}, Fun) ->
 	lists:foreach(Fun, Lines).
 
+foreach_line_test_() -> [
+	].
+
 new_buffer_coords(LineNo, LineOffset) ->
 	#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}.
 
+new_buffer_coords_test_() -> [
+	].
+
 to_string(#ee_buffer{lines = Lines}) ->
 	lines_to_string(Lines, []).
+
+to_string_test_() -> [
+	].
 
 %% ===================================================================
 %% Internal functions
