@@ -57,6 +57,7 @@ insert_text(#ee_buffer{lines = Lines} = Buffer, Text, #ee_buffer_coords{} = Inse
 	Buffer#ee_buffer{lines = insert_text_(Lines, Text, InsertCoords)}.
 
 insert_text_test_() -> [
+	?_assertEqual(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "HelloWorld", eol = none}]}, insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Hello", eol = none}]}, "World", #ee_buffer_coords{line_no = 1, line_offset = 6}))
 	].
 
 insert_eol(#ee_buffer{lines = Lines} = Buffer, #ee_buffer_coords{} = InsertCoords) ->
