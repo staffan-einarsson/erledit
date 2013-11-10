@@ -1,3 +1,4 @@
 .eunit
+doc
 ebin
 erl_crash.dump
