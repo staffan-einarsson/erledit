@@ -32,9 +32,11 @@
 -include("ee_global.hrl").
 -include("ee_buffer.hrl").
 
-%% ===================================================================
-%% API
-%% ===================================================================
+%%%-------------------------------------------------------------------
+%%% API
+%%%-------------------------------------------------------------------
+
+%%--------------------------------------------------------------------
 
 new()
 	->
@@ -45,6 +47,8 @@ new_test_()
 		[
 		?_assertEqual(#ee_buffer{lines = [#ee_buffer_line{}]}, new())
 		].
+
+%%--------------------------------------------------------------------
 
 create_from_string(
 		String
@@ -63,6 +67,8 @@ create_from_string_test_()
 			]},
 			create_from_string("Hello\nWorld"))
 		].
+
+%%--------------------------------------------------------------------
 
 insert_text(
 		#ee_buffer{lines = Lines},
@@ -103,6 +109,8 @@ insert_text_test_()
 			)
 		].
 
+%%--------------------------------------------------------------------
+
 insert_eol(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = InsertCoords
@@ -114,6 +122,8 @@ insert_eol_test_()
 	->
 		[
 		].
+
+%%--------------------------------------------------------------------
 
 remove_left(
 		#ee_buffer{lines = Lines} = Buffer,
@@ -127,6 +137,8 @@ remove_left_test_()
 		[
 		].
 
+%%--------------------------------------------------------------------
+
 remove_right(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = RemoveCoords
@@ -139,6 +151,8 @@ remove_right_test_()
 	->
 		[
 		].
+
+%%--------------------------------------------------------------------
 
 get_line(
 		#ee_buffer{lines = Lines},
@@ -159,6 +173,8 @@ get_line_test_()
 		[
 		].
 
+%%--------------------------------------------------------------------
+
 get_line_number(
 		#ee_buffer_line{line_no = LineNo}
 	)
@@ -169,6 +185,8 @@ get_line_number_test_()
 	->
 		[
 		].
+
+%%--------------------------------------------------------------------
 
 get_line_contents(
 		invalid_line
@@ -185,6 +203,8 @@ get_line_contents_test_()
 	->
 		[
 		].
+
+%%--------------------------------------------------------------------
 
 get_line_length(
 		Buffer,
@@ -209,6 +229,8 @@ get_line_length_test_()
 		[
 		].
 
+%%--------------------------------------------------------------------
+
 get_num_lines(
 		#ee_buffer{lines = Lines}
 	)
@@ -219,6 +241,8 @@ get_num_lines_test_()
 	->
 		[
 		].
+
+%%--------------------------------------------------------------------
 
 foreach_line(
 		#ee_buffer{lines = Lines},
@@ -232,6 +256,8 @@ foreach_line_test_()
 		[
 		].
 
+%%--------------------------------------------------------------------
+
 new_buffer_coords(
 		LineNo,
 		LineOffset
@@ -244,6 +270,8 @@ new_buffer_coords_test_()
 		[
 		].
 
+%%--------------------------------------------------------------------
+
 to_string(
 		#ee_buffer{lines = Lines}
 	)
@@ -255,15 +283,19 @@ to_string_test_()
 		[
 		].
 
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
+%%%-------------------------------------------------------------------
+%%% Internal functions
+%%%-------------------------------------------------------------------
+
+%%--------------------------------------------------------------------
 
 split_buffer(
 		String
 	)
 	->
 		split_buffer_loop(String, 1, [], []).
+
+%%--------------------------------------------------------------------
 
 split_buffer_loop(
 		[],
@@ -298,6 +330,8 @@ split_buffer_loop(
 	->
 		split_buffer_loop(T, CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev).
 
+%%--------------------------------------------------------------------
+
 insert_text_(
 		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents}|_],
 		_,
@@ -322,6 +356,8 @@ insert_text_(
 	->
 		%% TODO: Tail recursion.
 		[Line|insert_text_(T, Text, InsertCoords)].
+
+%%--------------------------------------------------------------------
 
 insert_eol_(
 		[],
@@ -351,6 +387,8 @@ insert_eol_(
 	->
 		[Line|insert_eol_(T, InsertCoords)].
 	
+%%--------------------------------------------------------------------
+
 remove_left_(
 		[],
 		_
@@ -388,6 +426,8 @@ remove_left_(
 	->
 		[Line|remove_left_(T, RemoveCoords)].
 
+%%--------------------------------------------------------------------
+
 %% We are at the end. No removal should be done.
 remove_right_(
 		Lines,
@@ -424,6 +464,8 @@ remove_right_(
 	->
 		[Line|remove_right_(T, RemoveCoords, LastLineLength)].
 	
+%%--------------------------------------------------------------------
+
 add_to_line_no(
 		[],
 		_
@@ -437,6 +479,8 @@ add_to_line_no(
 	->
 		[Line#ee_buffer_line{line_no = LineNo + Number}|add_to_line_no(T, Number)].
 
+%%--------------------------------------------------------------------
+
 lines_to_string(
 		[],
 		AccText
@@ -449,6 +493,8 @@ lines_to_string(
 	)
 	->
 		lines_to_string(T, AccText ++ Text ++ encode_eol(Eol)).
+
+%%--------------------------------------------------------------------
 
 encode_eol(
 		none
