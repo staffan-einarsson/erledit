@@ -469,7 +469,10 @@ remove_right_(
 		[Line|remove_right_(T, RemoveCoords, LastLineLength)].
 	
 %%--------------------------------------------------------------------
-
+%% @doc Gets the line from an ee_buffer object given by a number.
+%% @end
+%%--------------------------------------------------------------------
+-spec get_line(Buffer :: ee_buffer(), LineNo :: integer()) -> ee_buffer_line().
 get_line(
 		#ee_buffer{lines = Lines},
 		LineNo
@@ -478,15 +481,37 @@ get_line(
 	->
 		lists:nth(LineNo, Lines);
 get_line(
-		_Buffer,
-		_LineNo
+		_,
+		_
 	)
 	->
-		invalid_line.
+		erlang:error(bad_line_number).
 
 get_line_test_()
 	->
 		[
+		?_assertEqual(#ee_buffer_line{line_no = 2, contents = "Text2", eol = eol_lf},
+			get_line(#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf},
+				#ee_buffer_line{line_no = 2, contents = "Text2", eol = eol_lf},
+				#ee_buffer_line{line_no = 3, contents = "Text3", eol = eol_lf}
+				]}, 2)
+			),
+		?_assertError(bad_line_number,
+			get_line(#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf}
+				]}, 0)
+			),
+		?_assertError(bad_line_number,
+			get_line(#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf}
+				]}, -2)
+			),
+		?_assertError(bad_line_number,
+			get_line(#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf}
+				]}, 2)
+			)
 		].
 
 %%--------------------------------------------------------------------
