@@ -147,34 +147,31 @@ insert_text(
 		#ee_buffer_coords{} = InsertCoords
 	)
 	->
-		Buffer#ee_buffer{lines = insert_text_(Lines, Text, InsertCoords)}.
+		{NewLinesRev, _, _} = lists:foldl(fun insert_text_on_line/2, {[], InsertCoords, Text}, Lines),
+		Buffer#ee_buffer{lines = lists:reverse(NewLinesRev)}.
 
 %%--------------------------------------------------------------------
 
-insert_text_(
-		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents}|_],
-		_,
-		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
+insert_text_on_line(
+		#ee_buffer_line{line_no = InsertLineNo, contents = Contents},
+		{_, #ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}, _}
 	)
 		when InsertOffset > length(Contents) + 1
 	->
 		erlang:error(bad_buffer_coords);
-insert_text_(
-		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents} = Line|T],
-		Text,
-		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
+insert_text_on_line(
+		#ee_buffer_line{line_no = InsertLineNo, contents = Contents} = Line,
+		{PrevLinesRev, #ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset} = InsertCoords, Text}
 	)
 	->
 		{A, B} = lists:split(InsertOffset - 1, Contents),
-		[Line#ee_buffer_line{contents = A ++ (Text ++ B)}|T];
-insert_text_(
-		[Line|T],
-		Text,
-		InsertCoords
+		{[Line#ee_buffer_line{contents = A ++ (Text ++ B)} | PrevLinesRev], InsertCoords, Text};
+insert_text_on_line(
+		Line,
+		{PrevLinesRev, InsertCoords, Text}
 	)
 	->
-		%% TODO: Tail recursion.
-		[Line|insert_text_(T, Text, InsertCoords)].
+		{[Line | PrevLinesRev], InsertCoords, Text}.
 
 %%--------------------------------------------------------------------
 
