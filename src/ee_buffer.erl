@@ -112,6 +112,13 @@ insert_text_test_()
 %%--------------------------------------------------------------------
 
 insert_eol(
+		#ee_buffer{lines = Lines},
+		#ee_buffer_coords{line_no = InsertLineNo}
+	)
+		when InsertLineNo > 1, InsertLineNo > length(Lines)
+	->
+		erlang:error(bad_buffer_coords);
+insert_eol(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = InsertCoords
 	)
@@ -121,6 +128,94 @@ insert_eol(
 insert_eol_test_()
 	->
 		[
+		?_assertEqual(
+			#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "", eol = eol_lf}
+				]},
+			insert_eol(
+				#ee_buffer{lines = []},
+				ee_buffer_coords:new(1, 1))
+			),
+		?_assertEqual(
+			#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "", eol = eol_lf},
+				#ee_buffer_line{line_no = 2, contents = "Text", eol = none}
+				]},
+			insert_eol(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "Text", eol = none}
+					]},
+				ee_buffer_coords:new(1, 1))
+			),
+		?_assertEqual(
+			#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Te", eol = eol_lf},
+				#ee_buffer_line{line_no = 2, contents = "xt", eol = none}
+				]},
+			insert_eol(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "Text", eol = none}
+					]},
+				ee_buffer_coords:new(1, 3))
+			),
+		?_assertEqual(
+			#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Text", eol = eol_lf}
+				]},
+			insert_eol(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "Text", eol = none}
+					]},
+				ee_buffer_coords:new(1, 5))
+			),
+		?_assertError(
+			bad_buffer_coords,
+			insert_eol(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "Text", eol = none}
+					]},
+				ee_buffer_coords:new(1, 6))
+			),
+		?_assertEqual(
+			#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf},
+				#ee_buffer_line{line_no = 2, contents = "", eol = eol_lf},
+				#ee_buffer_line{line_no = 3, contents = "Text2", eol = eol_lf},
+				#ee_buffer_line{line_no = 4, contents = "Text3", eol = none}
+				]},
+			insert_eol(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf},
+					#ee_buffer_line{line_no = 2, contents = "Text2", eol = eol_lf},
+					#ee_buffer_line{line_no = 3, contents = "Text3", eol = none}
+					]},
+				ee_buffer_coords:new(2, 1))
+			),
+		?_assertEqual(
+			#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf},
+				#ee_buffer_line{line_no = 2, contents = "Text2", eol = eol_lf},
+				#ee_buffer_line{line_no = 3, contents = "", eol = eol_lf},
+				#ee_buffer_line{line_no = 4, contents = "Text3", eol = none}
+				]},
+			insert_eol(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf},
+					#ee_buffer_line{line_no = 2, contents = "Text2", eol = eol_lf},
+					#ee_buffer_line{line_no = 3, contents = "Text3", eol = none}
+					]},
+				ee_buffer_coords:new(2, 6))
+			),
+		?_assertError(
+			bad_buffer_coords,
+			insert_eol(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "Text1", eol = eol_lf},
+					#ee_buffer_line{line_no = 2, contents = "Text2", eol = eol_lf},
+					#ee_buffer_line{line_no = 3, contents = "Text3", eol = none}
+					]},
+				ee_buffer_coords:new(4, 1))
+			)
 		].
 
 %%--------------------------------------------------------------------
@@ -350,28 +445,47 @@ insert_eol_(
 		_
 	)
 	->
-		%% TODO: This makes it impossible to insert an eol in an empty buffer.
-		[];
+		[#ee_buffer_line{line_no = 1, contents = "", eol = eol_lf}];
 insert_eol_(
-		[#ee_buffer_line{line_no = LineNo} = Line|T],
-		#ee_buffer_coords{line_no = InsertLineNo} = InsertCoords
+		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents} = Line],
+		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
 	)
-		when LineNo > InsertLineNo
+		when InsertOffset == length(Contents) + 1
 	->
-		[Line#ee_buffer_line{line_no = LineNo + 1}|insert_eol_(T, InsertCoords)];
+		[Line#ee_buffer_line{eol = eol_lf}];
+insert_eol_(
+		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents}|_],
+		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
+	)
+		when InsertOffset > length(Contents) + 1
+	->
+		erlang:error(bad_buffer_coords);
 insert_eol_(
 		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents, eol = Eol} = Line|T],
-		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset} = InsertCoords
+		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
 	)
 	->
 		{A, B} = lists:split(InsertOffset - 1, Contents),
-		[Line#ee_buffer_line{contents = A, eol = eol_lf}, Line#ee_buffer_line{line_no = InsertLineNo + 1, contents = B, eol = Eol}|insert_eol_(T, InsertCoords)];
+		[Line#ee_buffer_line{contents = A, eol = eol_lf}, Line#ee_buffer_line{line_no = InsertLineNo + 1, contents = B, eol = Eol}|move_lines_down(T)];
 insert_eol_(
 		[Line|T],
 		InsertCoords
 	)
 	->
 		[Line|insert_eol_(T, InsertCoords)].
+
+%%--------------------------------------------------------------------
+
+move_lines_down(
+		[]
+	)
+	->
+		[];
+move_lines_down(
+		[#ee_buffer_line{line_no = LineNo} = Line|T]
+	)
+	->
+		[Line#ee_buffer_line{line_no = LineNo + 1}|move_lines_down(T)].
 	
 %%--------------------------------------------------------------------
 
