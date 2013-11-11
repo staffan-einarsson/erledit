@@ -25,7 +25,7 @@
 %-compile(export_all).
 
 -include("ee_global.hrl").
--include("ee_buffer.hrl").
+-include("ee_buffer_coords.hrl").
 -include("ee_caret.hrl").
 
 %% ===================================================================

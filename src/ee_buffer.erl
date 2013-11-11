@@ -23,7 +23,6 @@
 		get_line_length/1,
 		get_num_lines/1,
 		foreach_line/2,
-		new_buffer_coords/2,
 		to_string/1
 		]
 	).
@@ -31,6 +30,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include("ee_global.hrl").
 -include("ee_buffer.hrl").
+-include("ee_buffer_coords.hrl").
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -91,21 +91,21 @@ insert_text_test_()
 		[
 		?_assertEqual(
 			#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "TextAfterText", eol = none}]},
-			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "AfterText", new_buffer_coords(1, 5))
+			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "AfterText", ee_buffer_coords:new(1, 5))
 			),
 		?_assertEqual(
 			#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "TextBeforeText", eol = none}]},
-			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "TextBefore", new_buffer_coords(1, 1))
+			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "TextBefore", ee_buffer_coords:new(1, 1))
 			),
 		?_assertEqual(
 			#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Line1", eol = eol_lf}, #ee_buffer_line{line_no = 2, contents = "LiXXne2", eol = none}]},
-			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Line1", eol = eol_lf}, #ee_buffer_line{line_no = 2, contents = "Line2", eol = none}]}, "XX", new_buffer_coords(2, 3))
+			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Line1", eol = eol_lf}, #ee_buffer_line{line_no = 2, contents = "Line2", eol = none}]}, "XX", ee_buffer_coords:new(2, 3))
 			),
 		?_assertError(bad_buffer_coords,
-			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "NewText", new_buffer_coords(2, 1))
+			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "NewText", ee_buffer_coords:new(2, 1))
 			),
 		?_assertError(bad_buffer_coords,
-			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "NewText", new_buffer_coords(1, 10))
+			insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "NewText", ee_buffer_coords:new(1, 10))
 			)
 		].
 
@@ -254,21 +254,6 @@ foreach_line(
 foreach_line_test_()
 	->
 		[
-		].
-
-%%--------------------------------------------------------------------
-
-new_buffer_coords(
-		LineNo,
-		LineOffset
-	)
-	->
-		#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset}.
-
-new_buffer_coords_test_()
-	->
-		[
-		?_assertEqual(#ee_buffer_coords{line_no = 99, line_offset = 66}, new_buffer_coords(99, 66))
 		].
 
 %%--------------------------------------------------------------------
