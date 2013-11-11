@@ -38,10 +38,9 @@
 
 %%--------------------------------------------------------------------
 %% @doc Starts the server.
-%% @spec start_link() -> {ok, Pid::pid()}
 %% @end
 %%--------------------------------------------------------------------
-
+-spec start_link(list()) -> ok.
 start_link(Args) ->
 	gen_server:start_link(?MODULE, [Args], [
 		%{debug, [trace]}
