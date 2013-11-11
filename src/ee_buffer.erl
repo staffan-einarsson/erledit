@@ -37,7 +37,7 @@ new() ->
 	#ee_buffer{lines = [#ee_buffer_line{}]}.
 
 new_test_() -> [
-	?_assert(new() =:= #ee_buffer{lines = [#ee_buffer_line{}]})
+	?_assertEqual(#ee_buffer{lines = [#ee_buffer_line{}]}, new())
 	].
 
 create_from_string(String) ->
@@ -53,11 +53,25 @@ create_from_string_test_() -> [
 		create_from_string("Hello\nWorld"))
 	].
 
+insert_text(#ee_buffer{lines = Lines}, _, #ee_buffer_coords{line_no = InsertLineNo}) when InsertLineNo > length(Lines) ->
+	erlang:error(bad_buffer_coords);
 insert_text(#ee_buffer{lines = Lines} = Buffer, Text, #ee_buffer_coords{} = InsertCoords) ->
 	Buffer#ee_buffer{lines = insert_text_(Lines, Text, InsertCoords)}.
 
 insert_text_test_() -> [
-	?_assertEqual(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "HelloWorld", eol = none}]}, insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Hello", eol = none}]}, "World", #ee_buffer_coords{line_no = 1, line_offset = 6}))
+	?_assertEqual(
+		#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "TextAfterText", eol = none}]},
+		insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "AfterText", #ee_buffer_coords{line_no = 1, line_offset = 5})),
+	?_assertEqual(
+		#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "TextBeforeText", eol = none}]},
+		insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "TextBefore", #ee_buffer_coords{line_no = 1, line_offset = 1})),
+	?_assertEqual(
+		#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Line1", eol = eol_lf}, #ee_buffer_line{line_no = 2, contents = "LiXXne2", eol = none}]},
+		insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Line1", eol = eol_lf}, #ee_buffer_line{line_no = 2, contents = "Line2", eol = none}]}, "XX", #ee_buffer_coords{line_no = 2, line_offset = 3})),
+	?_assertError(bad_buffer_coords,
+		insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "NewText", #ee_buffer_coords{line_no = 2, line_offset = 1})),
+	?_assertError(bad_buffer_coords,
+		insert_text(#ee_buffer{lines = [#ee_buffer_line{line_no = 1, contents = "Text", eol = none}]}, "NewText", #ee_buffer_coords{line_no = 1, line_offset = 10}))
 	].
 
 insert_eol(#ee_buffer{lines = Lines} = Buffer, #ee_buffer_coords{} = InsertCoords) ->
@@ -152,6 +166,8 @@ split_buffer_loop([?ASCII_CR, ?ASCII_LF|T], CurrentLineNo, CurrentLineBufferRev,
 split_buffer_loop([Char|T], CurrentLineNo, CurrentLineBufferRev, PrevLinesRev) ->
 	split_buffer_loop(T, CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev).
 
+insert_text_([#ee_buffer_line{line_no = InsertLineNo, contents = Contents}|_], _, #ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}) when InsertOffset > length(Contents) + 1 ->
+	erlang:error(bad_buffer_coords);
 insert_text_([#ee_buffer_line{line_no = InsertLineNo, contents = Contents} = Line|T], Text, #ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}) ->
 	{A, B} = lists:split(InsertOffset - 1, Contents),
 	[Line#ee_buffer_line{contents = A ++ (Text ++ B)}|T];
