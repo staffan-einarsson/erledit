@@ -123,7 +123,7 @@ insert_eol(
 		#ee_buffer_coords{} = InsertCoords
 	)
 	->
-		Buffer#ee_buffer{lines = ?dbg_print(insert_eol_(Lines, InsertCoords))}.
+		Buffer#ee_buffer{lines = ?dbg_print(insert_eol_(Lines, InsertCoords, []))}.
 
 insert_eol_test_()
 	->
@@ -442,50 +442,57 @@ insert_text_(
 
 insert_eol_(
 		[],
-		_
+		_,
+		[]
 	)
 	->
 		[#ee_buffer_line{line_no = 1, contents = "", eol = eol_lf}];
 insert_eol_(
 		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents} = Line],
-		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
+		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset},
+		Res
 	)
 		when InsertOffset == length(Contents) + 1
 	->
-		[Line#ee_buffer_line{eol = eol_lf}];
+		lists:reverse([Line#ee_buffer_line{eol = eol_lf}|Res]);
 insert_eol_(
 		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents}|_],
-		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
+		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset},
+		_
 	)
 		when InsertOffset > length(Contents) + 1
 	->
 		erlang:error(bad_buffer_coords);
 insert_eol_(
 		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents, eol = Eol} = Line|T],
-		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset}
+		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset},
+		Res
 	)
 	->
 		{A, B} = lists:split(InsertOffset - 1, Contents),
-		[Line#ee_buffer_line{contents = A, eol = eol_lf}, Line#ee_buffer_line{line_no = InsertLineNo + 1, contents = B, eol = Eol}|move_lines_down(T)];
+		move_lines_down(T, [Line#ee_buffer_line{line_no = InsertLineNo + 1, contents = B, eol = Eol}, Line#ee_buffer_line{contents = A, eol = eol_lf}|Res]);
 insert_eol_(
 		[Line|T],
-		InsertCoords
+		InsertCoords,
+		Res
 	)
 	->
-		[Line|insert_eol_(T, InsertCoords)].
+		insert_eol_(T, InsertCoords, [Line|Res]).
 
 %%--------------------------------------------------------------------
 
 move_lines_down(
-		[]
+		[],
+		Res
 	)
 	->
-		[];
+		lists:reverse(Res);
 move_lines_down(
-		[#ee_buffer_line{line_no = LineNo} = Line|T]
+		[#ee_buffer_line{line_no = LineNo} = Line|T],
+		Res
 	)
 	->
-		[Line#ee_buffer_line{line_no = LineNo + 1}|move_lines_down(T)].
+		move_lines_down(T, [Line#ee_buffer_line{line_no = LineNo + 1}|Res]).
 	
 %%--------------------------------------------------------------------
 
