@@ -55,7 +55,7 @@ new_test_()
 %% @doc Creates an ee_buffer object from a string.
 %% @end
 %%--------------------------------------------------------------------
--spec create_from_string(string()) -> ee_buffer().
+-spec create_from_string(Text :: string()) -> ee_buffer().
 create_from_string(
 		String
 	)
@@ -121,7 +121,7 @@ split_buffer_loop(
 %% @doc Inserts a string of text into an existing ee_buffer object.
 %% @end
 %%--------------------------------------------------------------------
--spec insert_text(ee_buffer(), string(), ee_buffer_coords()) -> ee_buffer().
+-spec insert_text(Buffer :: ee_buffer(), Text :: string(), Coords :: ee_buffer_coords()) -> ee_buffer().
 insert_text(
 		#ee_buffer{lines = Lines},
 		_,
@@ -192,7 +192,7 @@ insert_text_(
 %% @doc Inserts a line ending into an existing ee_buffer object.
 %% @end
 %%--------------------------------------------------------------------
--spec insert_eol(ee_buffer(), ee_buffer_coords()) -> ee_buffer().
+-spec insert_eol(Buffer :: ee_buffer(), Coords :: ee_buffer_coords()) -> ee_buffer().
 insert_eol(
 		#ee_buffer{lines = Lines},
 		#ee_buffer_coords{line_no = InsertLineNo}
@@ -360,7 +360,7 @@ move_lines_down(
 %% @doc Removes one character to the left of a given coordinate in an ee_buffer object.
 %% @end
 %%--------------------------------------------------------------------
--spec remove_left(ee_buffer(), ee_buffer_coords()) -> ee_buffer().
+-spec remove_left(Buffer :: ee_buffer(), Coords :: ee_buffer_coords()) -> ee_buffer().
 remove_left(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = RemoveCoords
@@ -416,7 +416,7 @@ remove_left_(
 %% @doc Removes one character to the right of a given coordinate in an ee_buffer object.
 %% @end
 %%--------------------------------------------------------------------
--spec remove_right(ee_buffer(), ee_buffer_coords()) -> ee_buffer().
+-spec remove_right(Buffer :: ee_buffer(), Coords :: ee_buffer_coords()) -> ee_buffer().
 remove_right(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = RemoveCoords
