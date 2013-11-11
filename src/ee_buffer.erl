@@ -60,50 +60,41 @@ create_from_string(
 		String
 	)
 	->
-		#ee_buffer{lines = split_buffer(String)}.
+		{CurrentLineNo, CurrentLineBufferRev, PrevLinesRev, _} = lists:foldl(fun process_char/2, {1, [], [], false}, String),
+		FinalLines = case CurrentLineBufferRev of
+			[] -> 
+				lists:reverse(PrevLinesRev);
+			_ ->
+				lists:reverse([#ee_buffer_line{line_no = CurrentLineNo, contents = lists:reverse(CurrentLineBufferRev), eol = none} | PrevLinesRev])
+		end,
+		#ee_buffer{lines = FinalLines}.
 
 %%--------------------------------------------------------------------
 
-split_buffer(
-		String
+process_char(
+		?ASCII_LF,
+		{CurrentLineNo, CurrentLineBufferRev, PrevLinesRev, false}
 	)
 	->
-		split_buffer_loop(String, 1, [], []).
-
-%%--------------------------------------------------------------------
-
-split_buffer_loop(
-		[],
-		CurrentLineNo,
-		CurrentLineBufferRev,
-		PrevLinesRev
+		{CurrentLineNo + 1, [], [#ee_buffer_line{line_no = CurrentLineNo, contents = lists:reverse(CurrentLineBufferRev), eol = eol_lf} | PrevLinesRev], false};
+process_char(
+		?ASCII_LF,
+		{CurrentLineNo, CurrentLineBufferRev, PrevLinesRev, true}
 	)
 	->
-		lists:reverse([#ee_buffer_line{line_no = CurrentLineNo, contents = lists:reverse(CurrentLineBufferRev), eol = none}|PrevLinesRev]);
-split_buffer_loop(
-		[?ASCII_LF|T],
-		CurrentLineNo,
-		CurrentLineBufferRev,
-		PrevLinesRev
+		{CurrentLineNo + 1, [], [#ee_buffer_line{line_no = CurrentLineNo, contents = lists:reverse(CurrentLineBufferRev), eol = eol_crlf} | PrevLinesRev], false};
+process_char(
+		?ASCII_CR,
+		{CurrentLineNo, CurrentLineBufferRev, PrevLinesRev, false}
 	)
 	->
-		split_buffer_loop(T, CurrentLineNo + 1, [], [#ee_buffer_line{line_no = CurrentLineNo, contents = lists:reverse(CurrentLineBufferRev), eol = eol_lf}|PrevLinesRev]);
-split_buffer_loop(
-		[?ASCII_CR, ?ASCII_LF|T],
-		CurrentLineNo,
-		CurrentLineBufferRev,
-		PrevLinesRev
+		{CurrentLineNo, CurrentLineBufferRev, PrevLinesRev, true};
+process_char(
+		Char,
+		{CurrentLineNo, CurrentLineBufferRev, PrevLinesRev, _}
 	)
 	->
-		split_buffer_loop(T, CurrentLineNo + 1, [], [#ee_buffer_line{line_no = CurrentLineNo, contents = lists:reverse(CurrentLineBufferRev), eol = eol_crlf}|PrevLinesRev]);
-split_buffer_loop(
-		[Char|T],
-		CurrentLineNo,
-		CurrentLineBufferRev,
-		PrevLinesRev
-	)
-	->
-		split_buffer_loop(T, CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev).
+		{CurrentLineNo, [Char|CurrentLineBufferRev], PrevLinesRev, false}.
 
 %%--------------------------------------------------------------------
 
@@ -111,23 +102,30 @@ create_from_string_test_()
 	->
 		[
 		?_assertEqual(
-			#ee_buffer{lines = [
-				#ee_buffer_line{line_no = 1, contents = "", eol = none}
-				]
-			},
-			create_from_string("")),
+			#ee_buffer{lines = []},
+			create_from_string("")
+			),
 		?_assertEqual(
 			#ee_buffer{lines = [
 				#ee_buffer_line{line_no = 1, contents = "Hello", eol = none}
 				]
 			},
-			create_from_string("Hello")),
+			create_from_string("Hello")
+			),
+		?_assertEqual(
+			#ee_buffer{lines = [
+				#ee_buffer_line{line_no = 1, contents = "Hello", eol = eol_lf}
+				]
+			},
+			create_from_string("Hello\n")
+			),
 		?_assertEqual(
 			#ee_buffer{lines = [
 				#ee_buffer_line{line_no = 1, contents = "Hello", eol = eol_lf},
 				#ee_buffer_line{line_no = 2, contents = "World", eol = none}
 			]},
-			create_from_string("Hello\nWorld"))
+			create_from_string("Hello\nWorld")
+			)
 		].
 
 %%--------------------------------------------------------------------
