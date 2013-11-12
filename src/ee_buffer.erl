@@ -17,10 +17,7 @@
 		remove_left/2,
 		remove_right/2,
 		get_line/2,
-		get_line_number/1,
-		get_line_contents/1,
 		get_line_length/2,
-		get_line_length/1,
 		get_num_lines/1,
 		foreach_line/2,
 		to_string/1
@@ -29,8 +26,9 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include("ee_global.hrl").
--include("ee_buffer.hrl").
 -include("ee_buffer_coords.hrl").
+-include("ee_buffer_line.hrl").
+-include("ee_buffer.hrl").
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -257,6 +255,23 @@ insert_eol_(
 	)
 	->
 		insert_eol_(T, InsertCoords, [Line|Res]).
+
+%%--------------------------------------------------------------------
+
+add_to_line_no(
+		[],
+		_,
+		Res
+	)
+	->
+		lists:reverse(Res);
+add_to_line_no(
+		[#ee_buffer_line{line_no = LineNo} = Line|T],
+		Number,
+		Res
+	)
+	->
+		add_to_line_no(T, Number, [Line#ee_buffer_line{line_no = LineNo + Number}|Res]).
 
 %%--------------------------------------------------------------------
 
@@ -724,63 +739,18 @@ get_line_test_()
 		].
 
 %%--------------------------------------------------------------------
-
-get_line_number(
-		#ee_buffer_line{line_no = LineNo}
-	)
-	->
-		LineNo.
-
-get_line_number_test_()
-	->
-		[
-		?_assertEqual(
-			5,
-			get_line_number(#ee_buffer_line{line_no = 5})
-			)
-		].
-
+%% @doc Gets the length of a line from an ee_buffer object given by a line number.
+%% @end
 %%--------------------------------------------------------------------
-
-get_line_contents(
-		invalid_line
-	)
-	->
-		no_contents;
-get_line_contents(
-		#ee_buffer_line{contents = Contents}
-	)
-	->
-		Contents.
-
-get_line_contents_test_()
-	->
-		[
-		?_assertEqual(
-			"Hello",
-			get_line_contents(#ee_buffer_line{contents = "Hello"})
-			)
-		].
-
-%%--------------------------------------------------------------------
-
+-spec get_line_length(Buffer :: ee_buffer(), LineNo :: integer()) -> integer().
 get_line_length(
 		Buffer,
 		LineNo
 	)
 	->
-		get_line_length(get_line(Buffer, LineNo)).
+		ee_buffer_line:get_line_length(get_line(Buffer, LineNo)).
 
-get_line_length(
-		#ee_buffer_line{contents = Contents}
-	)
-	->
-		length(Contents);
-get_line_length(
-		invalid_line
-	)
-	->
-		invalid_line.
+%%--------------------------------------------------------------------
 
 get_line_length_test_()
 	->
@@ -794,30 +764,50 @@ get_line_length_test_()
 					#ee_buffer_line{line_no = 3, contents = "TextTextText", eol = none}
 					]},
 				2)
-			),
-		?_assertEqual(
-			8,
-			get_line_length(
-				#ee_buffer_line{line_no = 2, contents = "TextText", eol = eol_lf}
-				)
 			)
 		].
 
 %%--------------------------------------------------------------------
-
+%% @doc Gets the number of lines in an ee_buffer object.
+%% @end
+%%--------------------------------------------------------------------
+-spec get_num_lines(Buffer :: ee_buffer()) -> integer().
 get_num_lines(
 		#ee_buffer{lines = Lines}
 	)
 	->
 		length(Lines).
 
+%%--------------------------------------------------------------------
+
 get_num_lines_test_()
 	->
 		[
+		?_assertEqual(
+			0,
+			get_num_lines(
+				#ee_buffer{lines = []}
+				)
+			),
+		?_assertEqual(
+			5,
+			get_num_lines(
+				#ee_buffer{lines = [
+					ee_buffer_line:new(1, "Text1", eol_lf),
+					ee_buffer_line:new(2, "Text2", eol_lf),
+					ee_buffer_line:new(3, "Text3", eol_lf),
+					ee_buffer_line:new(4, "Text4", eol_lf),
+					ee_buffer_line:new(5, "Text5", eol_lf)
+					]}
+				)
+			)
 		].
 
 %%--------------------------------------------------------------------
-
+%% @doc Calls Fun(Line) for each line in Buffer.
+%% @end
+%%--------------------------------------------------------------------
+-spec foreach_line(Buffer :: ee_buffer(), Fun :: fun((Line :: ee_buffer_line()) -> term())) -> ok.
 foreach_line(
 		#ee_buffer{lines = Lines},
 		Fun
@@ -825,44 +815,44 @@ foreach_line(
 	->
 		lists:foreach(Fun, Lines).
 
+%%--------------------------------------------------------------------
+
 foreach_line_test_()
 	->
 		[
 		].
 
 %%--------------------------------------------------------------------
-
+%% @doc Converts Buffer to a string.
+%% @end
+%%--------------------------------------------------------------------
+-spec to_string(Buffer :: ee_buffer()) -> string().
 to_string(
 		#ee_buffer{lines = Lines}
 	)
 	->
 		lines_to_string(Lines, []).
 
+%%--------------------------------------------------------------------
+
 to_string_test_()
 	->
 		[
+		?_assertEqual(
+			"",
+			to_string(#ee_buffer{lines = []})
+			),
+		?_assertEqual(
+			"Bapp1\nBapp2\nBapp3\n",
+			to_string(
+				#ee_buffer{lines = [
+					ee_buffer_line:new(1, "Bapp1", eol_lf),
+					ee_buffer_line:new(2, "Bapp2", eol_lf),
+					ee_buffer_line:new(3, "Bapp3", eol_lf)
+					]}
+				)
+			)
 		].
-
-%%%-------------------------------------------------------------------
-%%% Internal functions
-%%%-------------------------------------------------------------------
-
-%%--------------------------------------------------------------------
-
-add_to_line_no(
-		[],
-		_,
-		Res
-	)
-	->
-		lists:reverse(Res);
-add_to_line_no(
-		[#ee_buffer_line{line_no = LineNo} = Line|T],
-		Number,
-		Res
-	)
-	->
-		add_to_line_no(T, Number, [Line#ee_buffer_line{line_no = LineNo + Number}|Res]).
 
 %%--------------------------------------------------------------------
 
