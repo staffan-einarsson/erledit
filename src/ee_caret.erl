@@ -1,9 +1,23 @@
-%%%-------------------------------------------------------------------
+%%% -------------------------------------------------------------------
 %%% @author Staffan <staffan.einarsson@gmail.com>
 %%% @copyright 2013 Staffan Einarsson
-%%% @doc 
+%%% @doc
 %%% @end
-%%%-------------------------------------------------------------------
+%%% -------------------------------------------------------------------
+%%% Copyright 2013 Staffan Einarsson
+%%% 
+%%% Licensed under the Apache License, Version 2.0 (the "License");
+%%% you may not use this file except in compliance with the License.
+%%% You may obtain a copy of the License at
+%%% 
+%%%     http://www.apache.org/licenses/LICENSE-2.0
+%%% 
+%%% Unless required by applicable law or agreed to in writing, software
+%%% distributed under the License is distributed on an "AS IS" BASIS,
+%%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%%% See the License for the specific language governing permissions and
+%%% limitations under the License.
+%%% -------------------------------------------------------------------
 
 -module(ee_caret).
 
@@ -28,9 +42,9 @@
 -include("ee_buffer_coords.hrl").
 -include("ee_caret.hrl").
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 %% API
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_left(
 		#ee_caret{} = Caret,
@@ -39,7 +53,7 @@ move_left(
 	->
 		move_horizontally(Caret, -1, Buffer).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_right(
 		#ee_caret{} = Caret,
@@ -48,7 +62,7 @@ move_right(
 	->
 		move_horizontally(Caret, 1, Buffer).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_up(
 		#ee_caret{line_no = LineNo} = Caret,
@@ -57,7 +71,7 @@ move_up(
 	->
 		move_to(Caret#ee_caret{line_no = LineNo - 1}, Buffer).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_down(
 		#ee_caret{line_no = LineNo} = Caret,
@@ -66,7 +80,7 @@ move_down(
 	->
 		move_to(Caret#ee_caret{line_no = LineNo + 1}, Buffer).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_up_one_page(
 		#ee_caret{line_no = LineNo} = Caret,
@@ -76,7 +90,7 @@ move_up_one_page(
 		%% Let's pretend one page is 10 lines for now.
 		move_to(Caret#ee_caret{line_no = LineNo - 10}, Buffer).
 	
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_down_one_page(
 		#ee_caret{line_no = LineNo} = Caret,
@@ -86,7 +100,7 @@ move_down_one_page(
 		%% Let's pretend one page is 10 lines for now.
 		move_to(Caret#ee_caret{line_no = LineNo + 10}, Buffer).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_horizontally(
 		Caret,
@@ -97,7 +111,7 @@ move_horizontally(
 		BufferCoords = #ee_buffer_coords{line_no = LineNo} = caret_to_buffer_coords(Caret, Buffer),
 		move_horizontally(Caret, BufferCoords, Amount, Buffer, ee_buffer:get_line_length(Buffer, LineNo), ee_buffer:get_line_length(Buffer, LineNo - 1), ee_buffer:get_num_lines(Buffer)).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 %% Move left more than one line AND this is the first line -> clamp at beginning of line
 move_horizontally(
@@ -164,7 +178,7 @@ move_horizontally(
 	->
 		buffer_coords_to_caret(ee_buffer_coords:new(LineNo, LineOffset + Amount), Buffer).
 	
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_to_beginning_of_line(
 		#ee_caret{} = Caret,
@@ -174,7 +188,7 @@ move_to_beginning_of_line(
 		#ee_buffer_coords{line_no = LineNo} = caret_to_buffer_coords(Caret, Buffer),
 		buffer_coords_to_caret(ee_buffer_coords:new(LineNo, 1), Buffer).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_to_end_of_line(
 		#ee_caret{} = Caret,
@@ -184,7 +198,7 @@ move_to_end_of_line(
 		#ee_buffer_coords{line_no = LineNo} = caret_to_buffer_coords(Caret, Buffer),
 		buffer_coords_to_caret(ee_buffer_coords:new(LineNo, ee_buffer:get_line_length(Buffer, LineNo) + 1), Buffer).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 move_to(
 		#ee_caret{line_no = LineNo} = Caret,
@@ -193,7 +207,7 @@ move_to(
 	->
 		move_to(Caret, caret_to_buffer_coords(Caret, Buffer), Buffer, ee_buffer:get_line_length(Buffer, LineNo), ee_buffer:get_num_lines(Buffer)).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 %% Move to a line before the beginning -> Clamp to first line
 move_to(
@@ -250,19 +264,19 @@ move_to(
 	->
 		Caret.	
 	
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 caret_to_buffer_coords(
 		#ee_caret{line_no = LineNo, col_no = ColNo},
 		Buffer
 	)
 	->
-		LineContents = ee_buffer:get_line_contents(ee_buffer:get_line(Buffer, LineNo)),
+		LineContents = ee_buffer_line:get_line_contents(ee_buffer:get_line(Buffer, LineNo)),
 		%% Get each char on line until colno has been reached.
 		Offset = caret_to_buffer_coords_loop(LineContents, 1, ColNo),
 		ee_buffer_coords:new(LineNo, Offset).
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 caret_to_buffer_coords_loop(
 		no_contents,
@@ -301,19 +315,19 @@ caret_to_buffer_coords_loop(
 	->
 		caret_to_buffer_coords_loop(T, Offset + 1, RemainCols - 1).
 	
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 buffer_coords_to_caret(
 		#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset},
 		Buffer
 	)
 	->
-		LineContents = ee_buffer:get_line_contents(ee_buffer:get_line(Buffer, LineNo)),
+		LineContents = ee_buffer_line:get_line_contents(ee_buffer:get_line(Buffer, LineNo)),
 		%% Get each char on line until colno has been reached.
 		ColNo = buffer_coords_to_caret_loop(LineContents, 1, LineOffset),
 		#ee_caret{line_no = LineNo, col_no = ColNo}.
 
-%%--------------------------------------------------------------------
+%% --------------------------------------------------------------------
 
 buffer_coords_to_caret_loop(
 		[],
