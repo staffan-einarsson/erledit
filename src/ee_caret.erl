@@ -77,6 +77,13 @@ move_left_test_()
 				)
 			),
 		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_left(
+				#ee_caret{line_no = 1, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
 			#ee_caret{line_no = 2, col_no = 3},
 			move_left(
 				#ee_caret{line_no = 2, col_no = 4},
@@ -87,6 +94,13 @@ move_left_test_()
 			#ee_caret{line_no = 1, col_no = 6},
 			move_left(
 				#ee_caret{line_no = 2, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 4, col_no = 7},
+			move_left(
+				#ee_caret{line_no = 4, col_no = 9},
 				TestBuffer
 				)
 			),
@@ -110,13 +124,6 @@ move_left_test_()
 				#ee_caret{line_no = 6, col_no = 1},
 				TestBuffer
 				)
-			),
-		?_assertEqual(
-			#ee_caret{line_no = 4, col_no = 7},
-			move_left(
-				#ee_caret{line_no = 4, col_no = 9},
-				TestBuffer
-				)
 			)
 		].
 
@@ -128,6 +135,79 @@ move_right(
 	)
 	->
 		move_horizontally(Caret, 1, Buffer).
+
+%% --------------------------------------------------------------------
+
+move_right_test_()
+	->
+		TestBufferEmpty = ee_buffer:new(),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "", none)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_right(
+				#ee_caret{line_no = 1, col_no = 1},
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 4},
+			move_right(
+				#ee_caret{line_no = 2, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 1},
+			move_right(
+				#ee_caret{line_no = 1, col_no = 6},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_right(
+				#ee_caret{line_no = 4, col_no = 8},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_right(
+				#ee_caret{line_no = 4, col_no = 9},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_right(
+				#ee_caret{line_no = 5, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_right(
+				#ee_caret{line_no = 5, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_right(
+				#ee_caret{line_no = 6, col_no = 1},
+				TestBuffer
+				)
+			)
+		].
 
 %% --------------------------------------------------------------------
 
