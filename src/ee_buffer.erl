@@ -56,7 +56,7 @@
 -spec new() -> ee_buffer().
 new()
 	->
-		#ee_buffer{lines = [#ee_buffer_line{}]}.
+		#ee_buffer{lines = [ee_buffer_line:new()]}.
 
 %% --------------------------------------------------------------------
 %% @doc Creates a new empty ee_buffer object.
@@ -146,7 +146,8 @@ create_from_string_test_()
 			),
 		?_assertEqual(
 			#ee_buffer{lines = [
-				#ee_buffer_line{line_no = 1, contents = "Hello", eol = eol_lf}
+				#ee_buffer_line{line_no = 1, contents = "Hello", eol = eol_lf},
+				#ee_buffer_line{line_no = 2, contents = "", eol = none}
 				]
 			},
 			create_from_string("Hello\n")
@@ -253,7 +254,7 @@ insert_eol(
 		#ee_buffer_coords{} = InsertCoords
 	)
 	->
-		Buffer#ee_buffer{lines = ?dbg_print(insert_eol_(Lines, InsertCoords, []))}.
+		Buffer#ee_buffer{lines = insert_eol_(Lines, InsertCoords, [])}.
 
 %% --------------------------------------------------------------------
 

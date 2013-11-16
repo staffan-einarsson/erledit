@@ -58,23 +58,17 @@ move_left(
 
 move_left_test_()
 	->
-		TestBufferEmpty = ee_buffer:new([ee_buffer_line:new(1, "", none)]),
+		TestBufferEmpty = ee_buffer:new(),
 		TestBuffer = ee_buffer:new(
 				[
 				ee_buffer_line:new(1, "Hello", eol_lf),
 				ee_buffer_line:new(2, "World", eol_lf),
 				ee_buffer_line:new(3, "How are you", eol_lf),
-				ee_buffer_line:new(4, "doing??", eol_lf)
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "", none)
 				]
 			),
 		[
-		?_assertEqual(
-			#ee_caret{line_no = 1, col_no = 1},
-			move_left(
-				#ee_caret{line_no = 1, col_no = 1},
-				ee_buffer:new([])
-				)
-			),
 		?_assertEqual(
 			#ee_caret{line_no = 1, col_no = 1},
 			move_left(
@@ -104,21 +98,21 @@ move_left_test_()
 				)
 			),
 		?_assertEqual(
-			#ee_caret{line_no = 5, col_no = 1},
+			#ee_caret{line_no = 4, col_no = 8},
 			move_left(
 				#ee_caret{line_no = 5, col_no = 2},
 				TestBuffer
 				)
 			),
 		?_assertEqual(
-			#ee_caret{line_no = 5, col_no = 1},
+			#ee_caret{line_no = 4, col_no = 8},
 			move_left(
 				#ee_caret{line_no = 6, col_no = 1},
 				TestBuffer
 				)
 			),
 		?_assertEqual(
-			#ee_caret{line_no = 4, col_no = 8},
+			#ee_caret{line_no = 4, col_no = 7},
 			move_left(
 				#ee_caret{line_no = 4, col_no = 9},
 				TestBuffer
@@ -182,8 +176,10 @@ move_horizontally(
 	)
 	->
 		BufferCoords = #ee_buffer_coords{line_no = LineNo} = caret_to_buffer_coords(Caret, Buffer),
-		move_horizontally(Caret, BufferCoords, Amount, Buffer, ee_buffer:get_line_length(Buffer, LineNo),
-			ee_buffer:get_line_length(Buffer, LineNo - 1), ee_buffer:get_num_lines(Buffer)).
+		CurrentLineLength = ee_buffer:get_line_length(Buffer, LineNo),
+		PreviousLineLength = (catch ee_buffer:get_line_length(Buffer, LineNo - 1)),
+		LastLineNo = ee_buffer:get_num_lines(Buffer),
+		move_horizontally(Caret, BufferCoords, Amount, Buffer, CurrentLineLength, PreviousLineLength, LastLineNo).
 
 %% --------------------------------------------------------------------
 
@@ -225,7 +221,7 @@ move_horizontally(
 	)
 		when Amount < 1 - LineOffset
 	->
-		move_horizontally(Caret, ee_buffer_coords:new(LineNo - 1, PreviousLineLength + 1), Amount + LineOffset, Buffer, PreviousLineLength, ee_buffer:get_line_length(Buffer, LineNo - 2), LastLineNo);
+		move_horizontally(Caret, ee_buffer_coords:new(LineNo - 1, PreviousLineLength + 1), Amount + LineOffset, Buffer, PreviousLineLength, catch ee_buffer:get_line_length(Buffer, LineNo - 2), LastLineNo);
 %% Move right more than one line -> subtract offset and recurse on next line
 move_horizontally(
 		Caret,
@@ -345,10 +341,11 @@ caret_to_buffer_coords(
 		Buffer
 	)
 	->
-		LineContents = ee_buffer_line:get_line_contents(ee_buffer:get_line(Buffer, LineNo)),
+		ActualLineNo = min(ee_buffer:get_num_lines(Buffer), LineNo),
+		LineContents = ee_buffer_line:get_line_contents(ee_buffer:get_line(Buffer, ActualLineNo)),
 		%% Get each char on line until colno has been reached.
 		Offset = caret_to_buffer_coords_loop(LineContents, 1, ColNo),
-		ee_buffer_coords:new(LineNo, Offset).
+		ee_buffer_coords:new(ActualLineNo, Offset).
 
 %% --------------------------------------------------------------------
 

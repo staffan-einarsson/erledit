@@ -20,8 +20,14 @@
 %%% -------------------------------------------------------------------
 
 %% Debug macro for printing an intermediate value.
--ifdef(debug).
--define(dbg_print(Term), erlang:apply(fun() -> Val = Term, io:format("dbg_print: ~p, ~p: ~p~n", [?FILE, ?LINE, Val]), Val end, [])).
--else.
--define(dbg_print(Term), Term).
--endif.
+-define(dbg_print(Term),
+	erlang:apply(
+		fun()
+			->
+				Val = (Term),
+				io:format("~s:~p: dbg_print: ~p~n", [?FILE, ?LINE, Val]),
+				Val
+			end,
+		[]
+		)
+	).
