@@ -220,6 +220,72 @@ move_up(
 
 %% --------------------------------------------------------------------
 
+move_up_test_()
+	->
+		TestBufferEmpty = ee_buffer:new(),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "", none)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_up(
+				#ee_caret{line_no = 1, col_no = 1},
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_up(
+				#ee_caret{line_no = 1, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 3},
+			move_up(
+				#ee_caret{line_no = 2, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 6},
+			move_up(
+				#ee_caret{line_no = 3, col_no = 12},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 6},
+			move_up(
+				#ee_caret{line_no = 3, col_no = 15},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 4, col_no = 1},
+			move_up(
+				#ee_caret{line_no = 5, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_up(
+				#ee_caret{line_no = 6, col_no = 1},
+				TestBuffer
+				)
+			)
+		].
+
+%% --------------------------------------------------------------------
+
 move_down(
 		#ee_caret{line_no = LineNo} = Caret,
 		Buffer
@@ -351,17 +417,22 @@ move_to_end_of_line(
 %% --------------------------------------------------------------------
 
 move_to(
-		#ee_caret{line_no = LineNo} = Caret,
+		Caret,
 		Buffer
 	)
 	->
-		move_to(Caret, caret_to_buffer_coords(Caret, Buffer), Buffer, ee_buffer:get_line_length(Buffer, LineNo), ee_buffer:get_num_lines(Buffer)).
+		Coords = #ee_buffer_coords{line_no = ActualLineNo} = caret_to_buffer_coords(Caret, Buffer),
+		move_to_buffer_coords(
+			Coords,
+			Buffer,
+			ee_buffer:get_line_length(Buffer, ActualLineNo),
+			ee_buffer:get_num_lines(Buffer)
+			).
 
 %% --------------------------------------------------------------------
 
 %% Move to a line before the beginning -> Clamp to first line
-move_to(
-		_Caret,
+move_to_buffer_coords(
 		#ee_buffer_coords{line_no = LineNo},
 		Buffer,
 		_LineLength,
@@ -371,8 +442,7 @@ move_to(
 	->
 		buffer_coords_to_caret(ee_buffer_coords:new(1, 1), Buffer);
 %% Move to a line after the end -> Clamp to last line
-move_to(
-		_Caret,
+move_to_buffer_coords(
 		#ee_buffer_coords{line_no = LineNo},
 		Buffer,
 		_LineLength,
@@ -382,8 +452,7 @@ move_to(
 	->
 		buffer_coords_to_caret(ee_buffer_coords:new(NumLines, ee_buffer:get_line_length(Buffer, NumLines) + 1), Buffer);
 %% Move to a line where the given pos is before beginning of line -> Clamp to beginning of line
-move_to(
-		_Caret,
+move_to_buffer_coords(
 		#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset},
 		Buffer,
 		_LineLength,
@@ -393,8 +462,7 @@ move_to(
 	->
 		buffer_coords_to_caret(ee_buffer_coords:new(LineNo, 1), Buffer);
 %% Move to a line where the given pos is after end of line -> Clamp to end of line
-move_to(
-		_Caret,
+move_to_buffer_coords(
 		#ee_buffer_coords{line_no = LineNo, line_offset = LineOffset},
 		Buffer,
 		LineLength,
@@ -404,24 +472,30 @@ move_to(
 	->
 		buffer_coords_to_caret(ee_buffer_coords:new(LineNo, LineLength + 1), Buffer);
 %% Move to a line where the given pos is valid
-move_to(
-		Caret,
-		_Coords,
-		_Buffer,
+move_to_buffer_coords(
+		Coords,
+		Buffer,
 		_LineLength,
 		_NumLines
 	)
 	->
-		Caret.	
+		buffer_coords_to_caret(Coords, Buffer).
 	
 %% --------------------------------------------------------------------
 
+caret_to_buffer_coords(
+		#ee_caret{line_no = LineNo},
+		_
+	)
+		when LineNo < 1
+	->
+		ee_buffer_coords:new(1, 1);
 caret_to_buffer_coords(
 		#ee_caret{line_no = LineNo, col_no = ColNo},
 		Buffer
 	)
 	->
-		ActualLineNo = min(ee_buffer:get_num_lines(Buffer), LineNo),
+		ActualLineNo = min(LineNo, ee_buffer:get_num_lines(Buffer)),
 		LineContents = ee_buffer_line:get_line_contents(ee_buffer:get_line(Buffer, ActualLineNo)),
 		%% Get each char on line until colno has been reached.
 		Offset = caret_to_buffer_coords_loop(LineContents, 1, ColNo),
@@ -475,19 +549,19 @@ buffer_coords_to_caret(
 	->
 		LineContents = ee_buffer_line:get_line_contents(ee_buffer:get_line(Buffer, LineNo)),
 		%% Get each char on line until colno has been reached.
-		ColNo = buffer_coords_to_caret_loop(LineContents, 1, LineOffset),
+		ColNo = find_column(LineContents, 1, LineOffset),
 		#ee_caret{line_no = LineNo, col_no = ColNo}.
 
 %% --------------------------------------------------------------------
 
-buffer_coords_to_caret_loop(
+find_column(
 		[],
 		Cols,
 		_RemainOffset
 	)
 	->
 		Cols;
-buffer_coords_to_caret_loop(
+find_column(
 		_Chars,
 		Cols,
 		RemainOffset
@@ -495,17 +569,17 @@ buffer_coords_to_caret_loop(
 		when RemainOffset =< 1
 	->
 		Cols;
-buffer_coords_to_caret_loop(
+find_column(
 		[$\t|T],
 		Cols,
 		RemainOffset
 	)
 	->
-		buffer_coords_to_caret_loop(T, Cols + 4, RemainOffset - 1);
-buffer_coords_to_caret_loop(
+		find_column(T, Cols + 4, RemainOffset - 1);
+find_column(
 		[_Char|T],
 		Cols,
 		RemainOffset
 	)
 	->
-		buffer_coords_to_caret_loop(T, Cols + 1, RemainOffset - 1).
+		find_column(T, Cols + 1, RemainOffset - 1).

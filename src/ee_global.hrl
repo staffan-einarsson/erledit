@@ -20,12 +20,12 @@
 %%% -------------------------------------------------------------------
 
 %% Debug macro for printing an intermediate value.
--define(dbg_print(Term),
+-define(debug_print(Term),
 	erlang:apply(
 		fun()
 			->
 				Val = (Term),
-				io:format("~s:~p: dbg_print: ~p~n", [?FILE, ?LINE, Val]),
+				io:format("~s:~p: debug_print: ~p~n", [?FILE, ?LINE, Val]),
 				Val
 			end,
 		[]
