@@ -25,6 +25,7 @@
 -export(
 		[
 		new/0,
+		new/1,
 		create_from_string/1,
 		insert_text/3,
 		insert_eol/2,
@@ -57,10 +58,29 @@ new()
 	->
 		#ee_buffer{lines = [#ee_buffer_line{}]}.
 
+%% --------------------------------------------------------------------
+%% @doc Creates a new empty ee_buffer object.
+%% @end
+%% --------------------------------------------------------------------
+-spec new(Lines :: [ee_buffer_line()]) -> ee_buffer().
+new(
+		Lines
+	)
+	->
+		#ee_buffer{lines = Lines}.
+
+%% --------------------------------------------------------------------
+
 new_test_()
 	->
+		Lines = [
+			ee_buffer_line:new(1, "All", eol_lf),
+			ee_buffer_line:new(1, "your", eol_lf),
+			ee_buffer_line:new(1, "base", eol_lf)
+			],
 		[
-		?_assertEqual(#ee_buffer{lines = [#ee_buffer_line{}]}, new())
+		?_assertEqual(#ee_buffer{lines = [ee_buffer_line:new()]}, new()),
+		?_assertEqual(#ee_buffer{lines = Lines}, new(Lines))
 		].
 
 %% --------------------------------------------------------------------
@@ -74,8 +94,8 @@ create_from_string(
 	->
 		{CurrentLineNo, CurrentLineBufferRev, PrevLinesRev, _} = lists:foldl(fun process_char/2, {1, [], [], false}, String),
 		FinalLines = case CurrentLineBufferRev of
-			[] -> 
-				lists:reverse(PrevLinesRev);
+			% [] -> 
+				% lists:reverse(PrevLinesRev);
 			_ ->
 				lists:reverse([#ee_buffer_line{line_no = CurrentLineNo, contents = lists:reverse(CurrentLineBufferRev), eol = none} | PrevLinesRev])
 		end,
@@ -114,7 +134,7 @@ create_from_string_test_()
 	->
 		[
 		?_assertEqual(
-			#ee_buffer{lines = []},
+			#ee_buffer{lines = [ee_buffer_line:new(1, "", none)]},
 			create_from_string("")
 			),
 		?_assertEqual(
@@ -152,7 +172,7 @@ insert_text(
 	)
 		when InsertLineNo > length(Lines)
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
 insert_text(
 		#ee_buffer{lines = Lines} = Buffer,
 		Text,
@@ -170,7 +190,7 @@ insert_text_on_line(
 	)
 		when InsertOffset > length(Contents) + 1
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
 insert_text_on_line(
 		#ee_buffer_line{line_no = InsertLineNo, contents = Contents} = Line,
 		{PrevLinesRev, #ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset} = InsertCoords, Text}
@@ -216,12 +236,18 @@ insert_text_test_()
 %% --------------------------------------------------------------------
 -spec insert_eol(Buffer :: ee_buffer(), Coords :: ee_buffer_coords()) -> ee_buffer().
 insert_eol(
+		#ee_buffer{lines = []},
+		_
+	)
+	->
+		error_invalid_buffer();
+insert_eol(
 		#ee_buffer{lines = Lines},
 		#ee_buffer_coords{line_no = InsertLineNo}
 	)
 		when InsertLineNo > 1, InsertLineNo > length(Lines)
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
 insert_eol(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = InsertCoords
@@ -253,7 +279,7 @@ insert_eol_(
 	)
 		when InsertOffset > length(Contents) + 1
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
 insert_eol_(
 		[#ee_buffer_line{line_no = InsertLineNo, contents = Contents, eol = Eol} = Line|T],
 		#ee_buffer_coords{line_no = InsertLineNo, line_offset = InsertOffset},
@@ -292,12 +318,20 @@ add_to_line_no(
 insert_eol_test_()
 	->
 		[
+		?_assertError(
+			invalid_buffer,
+			insert_eol(
+				#ee_buffer{lines = []},
+				ee_buffer_coords:new(1, 1))
+			),
 		?_assertEqual(
 			#ee_buffer{lines = [
 				#ee_buffer_line{line_no = 1, contents = "", eol = eol_lf}
 				]},
 			insert_eol(
-				#ee_buffer{lines = []},
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
 				ee_buffer_coords:new(1, 1))
 			),
 		?_assertEqual(
@@ -388,6 +422,12 @@ insert_eol_test_()
 %% --------------------------------------------------------------------
 -spec remove_left(Buffer :: ee_buffer(), Coords :: ee_buffer_coords()) -> ee_buffer().
 remove_left(
+		#ee_buffer{lines = []},
+		_
+	)
+	->
+		error_invalid_buffer();
+remove_left(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = RemoveCoords
 	)
@@ -402,14 +442,14 @@ remove_left_(
 		_
 	)
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
 remove_left_(
 		_,
 		#ee_buffer_coords{line_no = 1, line_offset = 1},
 		_
 	)
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
 %% An eol is being removed.
 %% TODO: Assumes now that lines appear in order, which might not be the case at all.
 remove_left_(
@@ -427,7 +467,7 @@ remove_left_(
 	)
 		when RemoveOffset > length(Contents) + 1
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
 remove_left_(
 		[#ee_buffer_line{line_no = RemoveLineNo, contents = Contents} = Line|T],
 		#ee_buffer_coords{line_no = RemoveLineNo, line_offset = RemoveOffset},
@@ -451,7 +491,7 @@ remove_left_test_()
 	->
 		[
 		?_assertError(
-			bad_buffer_coords,
+			invalid_buffer,
 			remove_left(
 				#ee_buffer{lines = []},
 				ee_buffer_coords:new(1, 1)
@@ -460,14 +500,27 @@ remove_left_test_()
 		?_assertError(
 			bad_buffer_coords,
 			remove_left(
-				#ee_buffer{lines = []},
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
+				ee_buffer_coords:new(1, 1)
+				)
+			),
+		?_assertError(
+			bad_buffer_coords,
+			remove_left(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
 				ee_buffer_coords:new(1, 2)
 				)
 			),
 		?_assertError(
 			bad_buffer_coords,
 			remove_left(
-				#ee_buffer{lines = []},
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
 				ee_buffer_coords:new(2, 1)
 				)
 			),
@@ -552,7 +605,7 @@ remove_right(
 		_
 	)
 	->
-		erlang:error(bad_buffer_coords);
+		error_invalid_buffer();
 remove_right(
 		#ee_buffer{lines = Lines} = Buffer,
 		#ee_buffer_coords{} = RemoveCoords
@@ -562,7 +615,13 @@ remove_right(
 
 %% --------------------------------------------------------------------
 
-%% An eol is being removed.
+remove_right_(
+		[],
+		_,
+		_
+	)
+	->
+		error_bad_buffer_coords();
 remove_right_(
 		[#ee_buffer_line{line_no = RemoveLineNo, contents = Contents}|_],
 		#ee_buffer_coords{line_no = RemoveLineNo, line_offset = RemoveOffset},
@@ -570,7 +629,15 @@ remove_right_(
 	)
 		when RemoveOffset > length(Contents) + 1
 	->
-		erlang:error(bad_buffer_coords);
+		error_bad_buffer_coords();
+remove_right_(
+		[#ee_buffer_line{line_no = RemoveLineNo, contents = Contents, eol = none}|_],
+		#ee_buffer_coords{line_no = RemoveLineNo, line_offset = RemoveOffset},
+		_
+	)
+		when RemoveOffset > length(Contents)
+	->
+		error_bad_buffer_coords();
 remove_right_(
 		[#ee_buffer_line{line_no = RemoveLineNo, contents = ContentsFirst}, #ee_buffer_line{contents = ContentsSecond, eol = Eol}|T],
 		#ee_buffer_coords{line_no = RemoveLineNo, line_offset = RemoveOffset},
@@ -611,7 +678,7 @@ remove_right_test_()
 	->
 		[
 		?_assertError(
-			bad_buffer_coords,
+			invalid_buffer,
 			remove_right(
 				#ee_buffer{lines = []},
 				ee_buffer_coords:new(1, 1)
@@ -620,14 +687,27 @@ remove_right_test_()
 		?_assertError(
 			bad_buffer_coords,
 			remove_right(
-				#ee_buffer{lines = []},
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
+				ee_buffer_coords:new(1, 1)
+				)
+			),
+		?_assertError(
+			bad_buffer_coords,
+			remove_right(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
 				ee_buffer_coords:new(1, 2)
 				)
 			),
 		?_assertError(
 			bad_buffer_coords,
 			remove_right(
-				#ee_buffer{lines = []},
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
 				ee_buffer_coords:new(2, 1)
 				)
 			),
@@ -758,6 +838,12 @@ get_line_test_()
 %% --------------------------------------------------------------------
 -spec get_line_length(Buffer :: ee_buffer(), LineNo :: integer()) -> integer().
 get_line_length(
+		#ee_buffer{lines = []},
+		_
+	)
+	->
+		error_invalid_buffer();
+get_line_length(
 		Buffer,
 		LineNo
 	)
@@ -769,6 +855,23 @@ get_line_length(
 get_line_length_test_()
 	->
 		[
+		?_assertError(
+			invalid_buffer,
+			get_line_length(#ee_buffer{lines = []},	1)),
+		?_assertEqual(
+			0,
+			get_line_length(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
+				1)),
+		?_assertError(
+			bad_line_number,
+			get_line_length(
+				#ee_buffer{lines = [
+					#ee_buffer_line{line_no = 1, contents = "", eol = none}
+					]},
+				2)),
 		?_assertEqual(
 			8,
 			get_line_length(
@@ -787,6 +890,11 @@ get_line_length_test_()
 %% --------------------------------------------------------------------
 -spec get_num_lines(Buffer :: ee_buffer()) -> integer().
 get_num_lines(
+		#ee_buffer{lines = []}
+	)
+	->
+		error_invalid_buffer();
+get_num_lines(
 		#ee_buffer{lines = Lines}
 	)
 	->
@@ -797,10 +905,18 @@ get_num_lines(
 get_num_lines_test_()
 	->
 		[
-		?_assertEqual(
-			0,
+		?_assertError(
+			invalid_buffer,
 			get_num_lines(
 				#ee_buffer{lines = []}
+				)
+			),
+		?_assertEqual(
+			1,
+			get_num_lines(
+				#ee_buffer{lines = [
+					ee_buffer_line:new(1, "", none)
+					]}
 				)
 			),
 		?_assertEqual(
@@ -842,6 +958,11 @@ foreach_line_test_()
 %% --------------------------------------------------------------------
 -spec to_string(Buffer :: ee_buffer()) -> string().
 to_string(
+		#ee_buffer{lines = []}
+	)
+	->
+		error_invalid_buffer();
+to_string(
 		#ee_buffer{lines = Lines}
 	)
 	->
@@ -852,9 +973,17 @@ to_string(
 to_string_test_()
 	->
 		[
+		?_assertError(
+			invalid_buffer,
+			to_string(#ee_buffer{lines = []})
+			),
 		?_assertEqual(
 			"",
-			to_string(#ee_buffer{lines = []})
+			to_string(
+				#ee_buffer{lines = [
+					ee_buffer_line:new(1, "", none)
+					]}
+				)
 			),
 		?_assertEqual(
 			"Bapp1\nBapp2\nBapp3\n",
@@ -881,6 +1010,7 @@ lines_to_string(
 		AccText
 	)
 	->
+		% TODO: Optimize using deep lists to avoid copying
 		lines_to_string(T, AccText ++ Text ++ encode_eol(Eol)).
 
 %% --------------------------------------------------------------------
@@ -900,3 +1030,15 @@ encode_eol(
 	)
 	->
 		[?ASCII_CR, ?ASCII_LF].
+
+%% --------------------------------------------------------------------
+
+error_invalid_buffer()
+	->
+		erlang:error(invalid_buffer).
+
+%% --------------------------------------------------------------------
+
+error_bad_buffer_coords()
+	->
+		erlang:error(bad_buffer_coords).

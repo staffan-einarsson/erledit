@@ -38,6 +38,7 @@
 		]
 	).
 
+-include_lib("eunit/include/eunit.hrl").
 -include("ee_global.hrl").
 -include("ee_buffer_coords.hrl").
 -include("ee_caret.hrl").
@@ -52,6 +53,78 @@ move_left(
 	)
 	->
 		move_horizontally(Caret, -1, Buffer).
+
+%% --------------------------------------------------------------------
+
+move_left_test_()
+	->
+		TestBufferEmpty = ee_buffer:new([ee_buffer_line:new(1, "", none)]),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_left(
+				#ee_caret{line_no = 1, col_no = 1},
+				ee_buffer:new([])
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_left(
+				#ee_caret{line_no = 1, col_no = 1},
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 3},
+			move_left(
+				#ee_caret{line_no = 2, col_no = 4},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 6},
+			move_left(
+				#ee_caret{line_no = 2, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 4, col_no = 8},
+			move_left(
+				#ee_caret{line_no = 5, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_left(
+				#ee_caret{line_no = 5, col_no = 2},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_left(
+				#ee_caret{line_no = 6, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 4, col_no = 8},
+			move_left(
+				#ee_caret{line_no = 4, col_no = 9},
+				TestBuffer
+				)
+			)
+		].
 
 %% --------------------------------------------------------------------
 
@@ -109,7 +182,8 @@ move_horizontally(
 	)
 	->
 		BufferCoords = #ee_buffer_coords{line_no = LineNo} = caret_to_buffer_coords(Caret, Buffer),
-		move_horizontally(Caret, BufferCoords, Amount, Buffer, ee_buffer:get_line_length(Buffer, LineNo), ee_buffer:get_line_length(Buffer, LineNo - 1), ee_buffer:get_num_lines(Buffer)).
+		move_horizontally(Caret, BufferCoords, Amount, Buffer, ee_buffer:get_line_length(Buffer, LineNo),
+			ee_buffer:get_line_length(Buffer, LineNo - 1), ee_buffer:get_num_lines(Buffer)).
 
 %% --------------------------------------------------------------------
 
