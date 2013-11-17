@@ -139,7 +139,7 @@ handle_info(timeout, State) ->
 	ee_document_controller:add_subscriber(self()),
 	{ok, Docs} = ee_document_controller:get_documents(),
 	DocSet = lists:foldl(fun add_document_view/2, ee_doc_set:new(), Docs),
-	ee_document_sup:open_document("readme"),
+	ee_document_sup:open_document("README"),
 	BlinkCaret = blink_caret_start(),
 	Window = create_window(),
 	{noreply, State#state{win = Window, doc_set = DocSet, blink_caret = BlinkCaret}};
