@@ -30,8 +30,8 @@
 		move_down/2,
 		move_to_beginning_of_line/2,
 		move_to_end_of_line/2,
-		move_up_one_page/2,
-		move_down_one_page/2,
+		move_up_one_page/3,
+		move_down_one_page/3,
 		move_to/2,
 		caret_to_buffer_coords/2,
 		buffer_coords_to_caret/2
@@ -401,22 +401,228 @@ move_down_test_()
 %% --------------------------------------------------------------------
 
 move_up_one_page(
-		#ee_caret{line_no = LineNo} = Caret,
+		Caret,
+		PageHeight,
 		Buffer
 	)
 	->
-		%% Let's pretend one page is 10 lines for now.
-		move_to(Caret#ee_caret{line_no = LineNo - 10}, Buffer).
+		AdjustedCaret = #ee_caret{line_no = AdjustedLineNo} =
+			buffer_coords_to_caret(caret_to_buffer_coords(Caret, Buffer), Buffer),
+		move_to(AdjustedCaret#ee_caret{line_no = AdjustedLineNo - PageHeight}, Buffer).
 	
 %% --------------------------------------------------------------------
 
+move_up_one_page_test_()
+	->
+		TestBufferEmpty = ee_buffer:new(),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "Hello", eol_lf),
+				ee_buffer_line:new(6, "World", eol_lf),
+				ee_buffer_line:new(7, "How are you", eol_lf),
+				ee_buffer_line:new(8, "doing??", eol_lf),
+				ee_buffer_line:new(9, "Hello", eol_lf),
+				ee_buffer_line:new(10, "World", eol_lf),
+				ee_buffer_line:new(11, "How are you", eol_lf),
+				ee_buffer_line:new(12, "doing??", eol_lf),
+				ee_buffer_line:new(13, "", none)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_up_one_page(
+				#ee_caret{line_no = 1, col_no = 1},
+				5,
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_up_one_page(
+				#ee_caret{line_no = 1, col_no = 3},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 3},
+			move_up_one_page(
+				#ee_caret{line_no = 6, col_no = 3},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 6},
+			move_up_one_page(
+				#ee_caret{line_no = 7, col_no = 12},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 6},
+			move_up_one_page(
+				#ee_caret{line_no = 7, col_no = 15},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 8, col_no = 1},
+			move_up_one_page(
+				#ee_caret{line_no = 13, col_no = 1},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 8, col_no = 1},
+			move_up_one_page(
+				#ee_caret{line_no = 14, col_no = 1},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 8, col_no = 1},
+			move_up_one_page(
+				#ee_caret{line_no = 14, col_no = 6},
+				5,
+				TestBuffer
+				)
+			)
+		].
+
+%% --------------------------------------------------------------------
+
 move_down_one_page(
-		#ee_caret{line_no = LineNo} = Caret,
+		Caret,
+		PageHeight,
 		Buffer
 	)
 	->
-		%% Let's pretend one page is 10 lines for now.
-		move_to(Caret#ee_caret{line_no = LineNo + 10}, Buffer).
+		AdjustedCaret = #ee_caret{line_no = AdjustedLineNo} =
+			buffer_coords_to_caret(caret_to_buffer_coords(Caret, Buffer), Buffer),
+		move_to(AdjustedCaret#ee_caret{line_no = AdjustedLineNo + PageHeight}, Buffer).
+
+%% --------------------------------------------------------------------
+
+move_down_one_page_test_()
+	->
+		TestBufferEmpty = ee_buffer:new(),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "Hello", eol_lf),
+				ee_buffer_line:new(6, "World", eol_lf),
+				ee_buffer_line:new(7, "How are you", eol_lf),
+				ee_buffer_line:new(8, "doing??", eol_lf),
+				ee_buffer_line:new(9, "Hello", eol_lf),
+				ee_buffer_line:new(10, "World", eol_lf),
+				ee_buffer_line:new(11, "How are you", eol_lf),
+				ee_buffer_line:new(12, "doing??", eol_lf),
+				ee_buffer_line:new(13, "", none)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_down_one_page(
+				#ee_caret{line_no = 1, col_no = 1},
+				5,
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 6, col_no = 1},
+			move_down_one_page(
+				#ee_caret{line_no = 0, col_no = 1},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 6, col_no = 1},
+			move_down_one_page(
+				#ee_caret{line_no = 0, col_no = 3},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 6, col_no = 3},
+			move_down_one_page(
+				#ee_caret{line_no = 1, col_no = 3},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 7, col_no = 6},
+			move_down_one_page(
+				#ee_caret{line_no = 2, col_no = 10},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 8, col_no = 8},
+			move_down_one_page(
+				#ee_caret{line_no = 3, col_no = 12},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 8, col_no = 8},
+			move_down_one_page(
+				#ee_caret{line_no = 3, col_no = 15},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 13, col_no = 1},
+			move_down_one_page(
+				#ee_caret{line_no = 12, col_no = 1},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 13, col_no = 1},
+			move_down_one_page(
+				#ee_caret{line_no = 12, col_no = 3},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 13, col_no = 1},
+			move_down_one_page(
+				#ee_caret{line_no = 13, col_no = 1},
+				5,
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 13, col_no = 1},
+			move_down_one_page(
+				#ee_caret{line_no = 13, col_no = 5},
+				5,
+				TestBuffer
+				)
+			)
+		].
 
 %% --------------------------------------------------------------------
 
@@ -511,6 +717,79 @@ move_to_beginning_of_line(
 
 %% --------------------------------------------------------------------
 
+move_to_beginning_of_line_test_()
+	->
+		TestBufferEmpty = ee_buffer:new(),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "", none)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 1, col_no = 1},
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 0, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 0, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 1, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 2, col_no = 10},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 5, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 5, col_no = 5},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_to_beginning_of_line(
+				#ee_caret{line_no = 6, col_no = 6},
+				TestBuffer
+				)
+			)
+		].
+
+%% --------------------------------------------------------------------
+
 move_to_end_of_line(
 		#ee_caret{} = Caret,
 		Buffer
@@ -518,6 +797,79 @@ move_to_end_of_line(
 	->
 		#ee_buffer_coords{line_no = LineNo} = caret_to_buffer_coords(Caret, Buffer),
 		buffer_coords_to_caret(ee_buffer_coords:new(LineNo, ee_buffer:get_line_length(Buffer, LineNo) + 1), Buffer).
+
+%% --------------------------------------------------------------------
+
+move_to_end_of_line_test_()
+	->
+		TestBufferEmpty = ee_buffer:new(),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "", none)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_to_end_of_line(
+				#ee_caret{line_no = 1, col_no = 1},
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 6},
+			move_to_end_of_line(
+				#ee_caret{line_no = 0, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 6},
+			move_to_end_of_line(
+				#ee_caret{line_no = 0, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 6},
+			move_to_end_of_line(
+				#ee_caret{line_no = 1, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 6},
+			move_to_end_of_line(
+				#ee_caret{line_no = 2, col_no = 10},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_to_end_of_line(
+				#ee_caret{line_no = 5, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_to_end_of_line(
+				#ee_caret{line_no = 5, col_no = 5},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_to_end_of_line(
+				#ee_caret{line_no = 6, col_no = 6},
+				TestBuffer
+				)
+			)
+		].
 
 %% --------------------------------------------------------------------
 
@@ -603,26 +955,26 @@ caret_to_buffer_coords(
 		ActualLineNo = min(LineNo, ee_buffer:get_num_lines(Buffer)),
 		LineContents = ee_buffer_line:get_line_contents(ee_buffer:get_line(Buffer, ActualLineNo)),
 		%% Get each char on line until colno has been reached.
-		Offset = caret_to_buffer_coords_loop(LineContents, 1, ColNo),
+		Offset = find_offset(LineContents, 1, ColNo),
 		ee_buffer_coords:new(ActualLineNo, Offset).
 
 %% --------------------------------------------------------------------
 
-caret_to_buffer_coords_loop(
+find_offset(
 		no_contents,
 		_,
 		_
 	)
 	->
 		no_contents;
-caret_to_buffer_coords_loop(
+find_offset(
 		[],
 		Offset,
 		_RemainCols
 	)
 	->
 		Offset;
-caret_to_buffer_coords_loop(
+find_offset(
 		_Chars,
 		Offset,
 		RemainCols
@@ -630,20 +982,20 @@ caret_to_buffer_coords_loop(
 		when RemainCols =< 1
 	->
 		Offset;
-caret_to_buffer_coords_loop(
+find_offset(
 		[$\t|T],
 		Offset,
 		RemainCols
 	)
 	->
-		caret_to_buffer_coords_loop(T, Offset + 1, RemainCols - 4);
-caret_to_buffer_coords_loop(
+		find_offset(T, Offset + 1, RemainCols - 4);
+find_offset(
 		[_Char|T],
 		Offset,
 		RemainCols
 	)
 	->
-		caret_to_buffer_coords_loop(T, Offset + 1, RemainCols - 1).
+		find_offset(T, Offset + 1, RemainCols - 1).
 	
 %% --------------------------------------------------------------------
 
