@@ -212,11 +212,13 @@ move_right_test_()
 %% --------------------------------------------------------------------
 
 move_up(
-		#ee_caret{line_no = LineNo} = Caret,
+		Caret,
 		Buffer
 	)
 	->
-		move_to(Caret#ee_caret{line_no = LineNo - 1}, Buffer).
+		AdjustedCaret = #ee_caret{line_no = AdjustedLineNo} =
+			buffer_coords_to_caret(caret_to_buffer_coords(Caret, Buffer), Buffer),
+		move_to(AdjustedCaret#ee_caret{line_no = AdjustedLineNo - 1}, Buffer).
 
 %% --------------------------------------------------------------------
 
@@ -276,9 +278,16 @@ move_up_test_()
 				)
 			),
 		?_assertEqual(
-			#ee_caret{line_no = 5, col_no = 1},
+			#ee_caret{line_no = 4, col_no = 1},
 			move_up(
 				#ee_caret{line_no = 6, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 4, col_no = 1},
+			move_up(
+				#ee_caret{line_no = 6, col_no = 6},
 				TestBuffer
 				)
 			)
@@ -287,11 +296,107 @@ move_up_test_()
 %% --------------------------------------------------------------------
 
 move_down(
-		#ee_caret{line_no = LineNo} = Caret,
+		Caret,
 		Buffer
 	)
 	->
-		move_to(Caret#ee_caret{line_no = LineNo + 1}, Buffer).
+		AdjustedCaret = #ee_caret{line_no = AdjustedLineNo} =
+			buffer_coords_to_caret(caret_to_buffer_coords(Caret, Buffer), Buffer),
+		move_to(AdjustedCaret#ee_caret{line_no = AdjustedLineNo + 1}, Buffer).
+
+%% --------------------------------------------------------------------
+
+move_down_test_()
+	->
+		TestBufferEmpty = ee_buffer:new(),
+		TestBuffer = ee_buffer:new(
+				[
+				ee_buffer_line:new(1, "Hello", eol_lf),
+				ee_buffer_line:new(2, "World", eol_lf),
+				ee_buffer_line:new(3, "How are you", eol_lf),
+				ee_buffer_line:new(4, "doing??", eol_lf),
+				ee_buffer_line:new(5, "", none)
+				]
+			),
+		[
+		?_assertEqual(
+			#ee_caret{line_no = 1, col_no = 1},
+			move_down(
+				#ee_caret{line_no = 1, col_no = 1},
+				TestBufferEmpty
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 1},
+			move_down(
+				#ee_caret{line_no = 0, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 1},
+			move_down(
+				#ee_caret{line_no = 0, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 2, col_no = 3},
+			move_down(
+				#ee_caret{line_no = 1, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 3, col_no = 6},
+			move_down(
+				#ee_caret{line_no = 2, col_no = 10},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 4, col_no = 8},
+			move_down(
+				#ee_caret{line_no = 3, col_no = 12},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 4, col_no = 8},
+			move_down(
+				#ee_caret{line_no = 3, col_no = 15},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_down(
+				#ee_caret{line_no = 4, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_down(
+				#ee_caret{line_no = 4, col_no = 3},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_down(
+				#ee_caret{line_no = 5, col_no = 1},
+				TestBuffer
+				)
+			),
+		?_assertEqual(
+			#ee_caret{line_no = 5, col_no = 1},
+			move_down(
+				#ee_caret{line_no = 5, col_no = 5},
+				TestBuffer
+				)
+			)
+		].
 
 %% --------------------------------------------------------------------
 
