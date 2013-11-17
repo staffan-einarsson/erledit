@@ -1,23 +1,23 @@
-%%% -------------------------------------------------------------------
-%%% @author Staffan <staffan.einarsson@gmail.com>
-%%% @copyright 2013 Staffan Einarsson
-%%% @doc
-%%% @end
-%%% -------------------------------------------------------------------
-%%% Copyright 2013 Staffan Einarsson
-%%% 
-%%% Licensed under the Apache License, Version 2.0 (the "License");
-%%% you may not use this file except in compliance with the License.
-%%% You may obtain a copy of the License at
-%%% 
-%%%     http://www.apache.org/licenses/LICENSE-2.0
-%%% 
-%%% Unless required by applicable law or agreed to in writing, software
-%%% distributed under the License is distributed on an "AS IS" BASIS,
-%%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%%% See the License for the specific language governing permissions and
-%%% limitations under the License.
-%%% -------------------------------------------------------------------
+%% --------------------------------------------------------------------
+%% @author Staffan <staffan.einarsson@gmail.com>
+%% @copyright 2013 Staffan Einarsson
+%% @doc
+%% @end
+%% --------------------------------------------------------------------
+%% Copyright 2013 Staffan Einarsson
+%% 
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%% 
+%%     http://www.apache.org/licenses/LICENSE-2.0
+%% 
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%% --------------------------------------------------------------------
 
 -module(ee_doc_set).
 
@@ -41,9 +41,9 @@
 -include("ee_global.hrl").
 -include("ee_doc_set.hrl").
 
-%% ===================================================================
+%% --------------------------------------------------------------------
 %% API
-%% ===================================================================
+%% --------------------------------------------------------------------
 
 new() ->
 	#ee_doc_set{}.
@@ -117,6 +117,6 @@ cycle_focus_doc(#ee_doc_set{focus_doc = FocusDoc0, background_docs = BgDocs0} = 
 	BgDocs3 = [FocusDoc0|BgDocs2],
 	DocSet#ee_doc_set{focus_doc = FocusDoc1, background_docs = BgDocs3}.
 
-%% ===================================================================
+%% --------------------------------------------------------------------
 %% Internal functions
-%% ===================================================================
+%% --------------------------------------------------------------------
